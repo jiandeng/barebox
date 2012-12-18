@@ -5,4 +5,11 @@
 	make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
 	# write image to SD card, and boot from SD
 	sudo dd if=./barebox.s5p of=/dev/sdb bs=512 seek=1
+2.Add dm9000 network support
+	# set ipaddress on your target board
+	eth0.ipaddr=192.168.0.100                                             
+	eth0.netmask=255.255.255.0                                            
+	# ping your laptop
+	ping 192.168.0.10                                                     
+		=>host 192.168.0.10 is alive 
 

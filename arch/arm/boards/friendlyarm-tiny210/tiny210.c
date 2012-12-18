@@ -38,7 +38,16 @@
 #include <mach/s3c-iomap.h>
 #include <mach/s3c-clocks.h>
 #include <mach/s3c-generic.h>
+#include <mach/s3c-busctl.h>
 
+/*
+ * dm9000 network controller onboard
+ * Connected to CS line 1 and interrupt line EINT7,
+ * data width is 16 bit.
+ */
+static struct dm9000_platform_data dm9000_data = {
+	.srom     = 1,
+};
 
 static const unsigned pin_usage[] = {
 	/* TODO */
@@ -75,6 +84,19 @@ static int tiny210_mem_init(void)
 }
 mem_initcall(tiny210_mem_init);
 
+static int tiny210_dm9000_init(void)
+{
+	uint32_t reg;
+
+	reg = readl(S3C_BWSCON);
+	reg &= ~0x000000f0;
+	reg |=  0x00000010;	
+	writel(0x00050000, S3C_BANKCON1);
+	writel(reg, S3C_BWSCON);
+
+	return 0;
+}
+
 static int tiny210_console_init(void)
 {
 	/*
@@ -104,6 +126,10 @@ static int tiny210_devices_init(void)
 		gpio_direction_output(leds[i].gpio, leds[i].active_low);
 		led_gpio_register(&leds[i]);
 	}
+
+	tiny210_dm9000_init();
+	add_dm9000_device(0, S3C_CS1_BASE + 0x1000, S3C_CS1_BASE + 0x400C,
+			  IORESOURCE_MEM_16BIT, &dm9000_data);
 
 	armlinux_set_bootparams((void*)S3C_SDRAM_BASE + 0x100);
 	armlinux_set_architecture(MACH_TYPE_MINI210);

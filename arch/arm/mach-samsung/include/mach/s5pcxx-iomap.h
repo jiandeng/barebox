@@ -16,6 +16,7 @@
 
 /* S5PV210 device base addresses */
 
+#define S3C_MEMCTL_BASE 	0xE8000000
 #define S5P_CLOCK_POWER_BASE	0xE0100000
 #define S3C_GPIO_BASE		0xE0200000
 #define S3C_TIMER_BASE		0xE2500000
