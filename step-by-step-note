@@ -1,0 +1,8 @@
+1.Try out the original code
+	# make with the default config
+	cp arch/arm/configs/friendlyarm_tiny210_defconfig .config
+	make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- menuconfig
+	make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
+	# write image to SD card, and boot from SD
+	sudo dd if=./barebox.s5p of=/dev/sdb bs=512 seek=1
+
