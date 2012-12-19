@@ -12,4 +12,9 @@
 	# ping your laptop
 	ping 192.168.0.10                                                     
 		=>host 192.168.0.10 is alive 
-
+3.Switch to new environment
+	# ipaddress is set in arch/arm/boards/friendlyarm-tiny210/env/network/eth0 
+	# tftp file system is auto mounted under /mnt/tftp, you can't ls that dir or use tab to auto complete file names
+	# on your laptop, echo 'hello world!'> ~/tftp/hello.txt
+	# on the target board, cat /mnt/tftp/hello.txt
+		=>hello world!

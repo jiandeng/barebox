@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# ip setting (static/dhcp)
+#ip=dhcp
+#global.dhcp.vendor_id=barebox-${global.hostname}
+
+# static setup used if ip=static
+ip=static
+ipaddr=192.168.0.100
+netmask=255.255.255.0
+gateway=192.168.0.1
+serverip=192.168.0.10
+
+# MAC address if needed
+ethaddr=12:34:56:78:9A:BC
+
+# put code to discover eth0 (i.e. 'usb') to /env/network/eth0-discover
