@@ -18,3 +18,8 @@
 	# on your laptop, echo 'hello world!'> ~/tftp/hello.txt
 	# on the target board, cat /mnt/tftp/hello.txt
 		=>hello world!
+4.Support skip lowlevel init
+	# by disable "General settings -> run machine low-level init", you can skip lowlevel init
+	# then the barebox.bin can be used as a second stage bootloader
+	# put barebox.bin into ~/tftp/ on your laptop
+	# on the target boared: cp /mnt/tftp/barebox.bin /dev/ram0 && go /dev/ram0
