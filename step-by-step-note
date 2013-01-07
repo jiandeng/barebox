@@ -23,3 +23,19 @@
 	# then the barebox.bin can be used as a second stage bootloader
 	# put barebox.bin into ~/tftp/ on your laptop
 	# on the target boared: cp /mnt/tftp/barebox.bin /dev/ram0 && go /dev/ram0
+5.Add SLC NAND support
+	# BUG in function mtdraw_read_unaligned() in file drivers/mtd/mtdraw.c
+	# INIT ops.ooboffs to zero, to slove nand_transfer_oob() issue in file drivers/mtd/nand/nand_base.c
+	# BUG in function mtd_ioctl() in file drivers/mtd/mtdraw.c
+	# CHANGE mtd_ioctl(), to slove ioctl function problem in mtdraw & mtdoob devices 
+	# ADD SLC driver for both 1-bit & 8-bit ECC, select 8-bit ECC by define CONFIG_S3C_NAND_USE_8BIT_ECC in nand_s5vp210.c	
+	# ADD nanddump command to read & print 1 page nand data, see commands/nanddump.c for more
+	# TO test the nand driver, make and load barebox.bin to sdram, then use nandtest & nanddump commands
+	# write random data to the 17th (0x220000 / 0x20000) block, then read out and check if it's right	
+	nandtest -o 0x220000 -l 0x20000 -s 2 -t dev/nand0
+	# Read out the 17th block with ecc check	
+	nanddump -b 17 -d /dev/nand0
+	# Read out the oob data of the 17th block
+	nanddump -b 17 -o
+	# Read out the raw data of the 17th block
+	nanddump -b 17 -r

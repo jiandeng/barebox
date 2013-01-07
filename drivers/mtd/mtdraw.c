@@ -100,6 +100,7 @@ static ssize_t mtdraw_read_unaligned(struct mtd_info *mtd, void *dst,
 	ops.mode = MTD_OOB_RAW;
 	ops.datbuf = tmp;
 	ops.len = mtd->writesize;
+	ops.ooboffs = 0;
 	ops.oobbuf = tmp + mtd->writesize;
 	ops.ooblen = mtd->oobsize;
 	ret = mtd->read_oob(mtd, offset, &ops);

@@ -82,6 +82,7 @@ static int add_mtdoob_device(struct mtd_info *mtd, char *devname, void **priv)
 	mtdoob->cdev.name = asprintf("%s_oob%d", devname, mtd->class_dev.id);
 	mtdoob->cdev.priv = mtdoob;
 	mtdoob->cdev.dev = &mtd->class_dev;
+	mtdoob->cdev.mtd = mtd;
 	mtdoob->mtd = mtd;
 	*priv = mtdoob;
 	devfs_create(&mtdoob->cdev);

@@ -488,6 +488,12 @@ config CMD_NANDTEST
 	select PARTITION_NEED_MTD
 	prompt "nandtest"
 
+config CMD_NANDDUMP
+	tristate
+	depends on NAND
+	depends on MTD_RAW_DEVICE
+	prompt "nanddump"
+
 config CMD_MTEST
 	tristate
 	prompt "mtest"

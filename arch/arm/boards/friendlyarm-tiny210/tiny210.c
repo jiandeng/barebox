@@ -50,7 +50,17 @@ static struct dm9000_platform_data dm9000_data = {
 };
 
 static const unsigned pin_usage[] = {
-	/* TODO */
+	/* NAND */
+	MP030_NFCLE,
+	MP031_NFALE,
+	MP032_NFWE,
+	MP033_NFRE,	
+	MP034_NFRnB0,
+	MP012_NFCSn0,
+	/* DM9000 */
+	MP017_WEn,
+	MP016_OEn,
+	MP011_CSn1,
 };
 
 static struct gpio_led leds[] = {
@@ -130,6 +140,8 @@ static int tiny210_devices_init(void)
 	tiny210_dm9000_init();
 	add_dm9000_device(0, S3C_CS1_BASE + 0x1000, S3C_CS1_BASE + 0x400C,
 			  IORESOURCE_MEM_16BIT, &dm9000_data);
+        add_generic_device("s3c_nand", DEVICE_ID_DYNAMIC, NULL,
+                         S3C_NAND_BASE, 0x40000, IORESOURCE_MEM, NULL);
 
 	armlinux_set_bootparams((void*)S3C_SDRAM_BASE + 0x100);
 	armlinux_set_architecture(MACH_TYPE_MINI210);
