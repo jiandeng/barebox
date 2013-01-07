@@ -1,0 +1,2 @@
+#!/bin/sh
+cp /mnt/tftp/barebox.bin /dev/ram0 && go /dev/ram0
