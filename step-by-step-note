@@ -39,3 +39,50 @@
 	nanddump -b 17 -o
 	# Read out the raw data of the 17th block
 	nanddump -b 17 -r
+6.Boot the kernel
+	# increase the heap size to 8MB as the bootm command will copy uImage form tftp server to ramfs, which uses the heap
+	# add script for basic config: has something to do with the bootargs (commandline)
+	# add script for nand mtdparts: has something to do with nand booting
+	# add script for net booting: boot uImage from tftpserver & mount rootfs from nfsserver
+	# modify the low level serial code of the FriendlyARM kernel so that it can boot from barebox
+		--- arch/arm/mach-s5pv210/include/mach/uncompress.h.old	2013-04-10 21:59:24.065238578 +0800
+		+++ arch/arm/mach-s5pv210/include/mach/uncompress.h	2013-04-10 18:07:08.395060709 +0800
+		@@ -18,7 +18,12 @@
+		 static void arch_detect_cpu(void)
+		 {
+		-	/* we do not need to do any cpu detection here at the moment. */
+		+	/*
+		+	 * For preventing FIFO overrun or infinite loop of UART console,
+		+	 * fifo_max should be the minimum fifo size of all of the UART channels
+		+	 */
+		+	fifo_mask = S5PV210_UFSTAT_TXMASK;
+		+	fifo_max = 15 << S5PV210_UFSTAT_TXSHIFT;
+		 }
+
+		--- .config.old	2013-04-10 21:55:24.364049956 +0800
+		+++ .config	2013-04-10 21:55:07.887968266 +0800
+		@@ -278,7 +278,7 @@
+		 #
+		 # CONFIG_S3C_BOOT_WATCHDOG is not set
+		 # CONFIG_S3C_BOOT_ERROR_RESET is not set
+		-CONFIG_S3C_BOOT_UART_FORCE_FIFO=y
+		+# CONFIG_S3C_BOOT_UART_FORCE_FIFO is not set
+		 CONFIG_S3C_LOWLEVEL_UART_PORT=0
+		 CONFIG_SAMSUNG_CLKSRC=y
+		 CONFIG_SAMSUNG_IRQ_VIC_TIMER=y
+	# to test net booting, first make the uImage & put it into the tftp dir
+	make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- uImage && cp arch/arm/boot/uImage ~/tftp/	
+	# and put the rootfs files into the nfs dir (/home/doudou/nfsroot/tiny210)
+	# install & configure nfs server
+	sudo apt-get install nfs-kernel-server
+	sudo vi /etc/exports (add a new line)
+		/home/doudou/nfsroot/tiny210 192.168.0.*(rw,sync,no_root_squash)
+	sudo /etc/init.d/portmap restart && sudo /etc/init.d/nfs-kernel-server restart
+	sudo mount -t nfs 192.168.0.10:/home/doudou/nfsroot/tiny210 /mnt/nfs/ && sudo umount /mnt/nfs
+
+	# to test nand booting, first write the uImage into nand flash
+	erase /dev/nand0.kernel && cp /mnt/tftp/uImage /dev/nand0.kernel
+	# and configure the root bootarg
+	global linux.bootargs.dyn.root="root=/dev/nfs nfsroot=192.168.0.10:/home/doudou/nfsroot/tiny210 ip=192.168.0.100:192.168.0.10:192.168.1.1:255.255.255.0::eth0"
+	# boot from the kernel partition
+	bootm /dev/nand0.kernel

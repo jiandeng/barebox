@@ -1,0 +1,3 @@
+global.user=doudou
+global.hostname=tiny210
+global.linux.bootargs.base="console=ttySAC0,115200"
