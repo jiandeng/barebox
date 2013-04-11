@@ -78,7 +78,7 @@ static ssize_t mtd_write(struct cdev* cdev, const void *buf, size_t _count,
 int mtd_ioctl(struct cdev *cdev, int request, void *buf)
 {
 	int ret = 0;
-	struct mtd_info *mtd = cdev->mtd;
+	struct mtd_info *mtd = cdev->priv;
 	struct mtd_info_user *user = buf;
 #if (defined(CONFIG_NAND_ECC_HW) || defined(CONFIG_NAND_ECC_SOFT))
 	struct mtd_ecc_stats *ecc = buf;

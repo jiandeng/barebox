@@ -143,6 +143,13 @@ static int tiny210_devices_init(void)
         add_generic_device("s3c_nand", DEVICE_ID_DYNAMIC, NULL,
                          S3C_NAND_BASE, 0x40000, IORESOURCE_MEM, NULL);
 
+#ifdef CONFIG_PARTITION
+	devfs_add_partition("nand0", 0x00000, SZ_512K, DEVFS_PARTITION_FIXED, "self_raw");
+	dev_add_bb_dev("self_raw", "self0");
+	devfs_add_partition("nand0", SZ_512K, SZ_512K, DEVFS_PARTITION_FIXED, "env_raw");
+	dev_add_bb_dev("env_raw", "env0");
+#endif
+
 	armlinux_set_bootparams((void*)S3C_SDRAM_BASE + 0x100);
 	armlinux_set_architecture(MACH_TYPE_MINI210);
 
