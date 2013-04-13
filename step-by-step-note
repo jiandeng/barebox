@@ -86,3 +86,10 @@
 	global linux.bootargs.dyn.root="root=/dev/nfs nfsroot=192.168.0.10:/home/doudou/nfsroot/tiny210 ip=192.168.0.100:192.168.0.10:192.168.1.1:255.255.255.0::eth0"
 	# boot from the kernel partition
 	bootm /dev/nand0.kernel
+7.Saving ENV in NAND
+	The original ENV is generated from the ENV scripts in the defaultenv-2 & $(BOARD)/env directories
+	Modify ENV scripts in /env/ directory with edit command
+	Save ENV to /dev/env0 (also /dev/nand0.bareboxenv.bb) with saveenv command
+	Load ENV from /dev/env0 (also /dev/nand0.bareboxenv.bb) with loadenv command
+	Updating barebox doesn't change the ENV as it's not in the same partition
+	You may want to erase /dev/env0 or load env.bin to update it
