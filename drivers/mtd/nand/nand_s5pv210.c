@@ -20,8 +20,6 @@
  *
 */
 
-//#define CONFIG_S3C_NAND_USE_8BIT_ECC
-
 #include <config.h>
 #include <common.h>
 #include <driver.h>
@@ -33,6 +31,13 @@
 #include <mach/s3c-iomap.h>
 #include <io.h>
 #include <asm-generic/errno.h>
+
+#ifdef CONFIG_S5P_NAND_BOOT
+#define __nand_boot_init __bare_init
+#else
+#define __nand_boot_init
+#define CONFIG_S3C_NAND_USE_8BIT_ECC
+#endif
 
 /* NAND controller's register */
 #define NFCONF     0x00
@@ -164,7 +169,7 @@ static struct nand_ecclayout s3c_nand_oob_64_8bit = {
  * @param[in] host Base address of the NAND controller
  * @param[in] cmd Command for NAND flash
  */
-static void send_cmd(void __iomem *host, uint8_t cmd)
+static void __nand_boot_init send_cmd(void __iomem *host, uint8_t cmd)
 {
 	writeb(cmd, host + NFCMMD);
 }
@@ -174,7 +179,7 @@ static void send_cmd(void __iomem *host, uint8_t cmd)
  * @param[in] host Base address of the NAND controller
  * @param[in] addr Address for the NAND flash
  */
-static void send_addr(void __iomem *host, uint8_t addr)
+static void __nand_boot_init send_addr(void __iomem *host, uint8_t addr)
 {
 	writeb(addr, host + NFADDR);
 }
@@ -183,7 +188,7 @@ static void send_addr(void __iomem *host, uint8_t addr)
  * Enable the NAND flash access
  * @param[in] host Base address of the NAND controller
  */
-static void enable_cs(void __iomem *host)
+static void __nand_boot_init enable_cs(void __iomem *host)
 {
 	writel(readl(host + NFCONT) & ~NFCONT_nFCE0, host + NFCONT);
 }
@@ -192,7 +197,7 @@ static void enable_cs(void __iomem *host)
  * Disable the NAND flash access
  * @param[in] host Base address of the NAND controller
  */
-static void disable_cs(void __iomem *host)
+static void __nand_boot_init disable_cs(void __iomem *host)
 {
 	writel(readl(host + NFCONT) | NFCONT_nFCE0, host + NFCONT);
 }
@@ -202,7 +207,7 @@ static void disable_cs(void __iomem *host)
  * @param[in] host Base address of the NAND controller
  * @param[in] timing Timing to access the NAND memory
  */
-static void enable_nand_controller(void __iomem *host, uint32_t timing)
+static void __nand_boot_init enable_nand_controller(void __iomem *host, uint32_t timing)
 {
 	writel(NFCONT_EN | NFCONT_nFCE0, host + NFCONT);
 	writel(timing | NFCONF_ADDRCYCLE, host + NFCONF);
@@ -212,7 +217,7 @@ static void enable_nand_controller(void __iomem *host, uint32_t timing)
  * Diable the NAND flash controller
  * @param[in] host Base address of the NAND controller
  */
-static void disable_nand_controller(void __iomem *host)
+static void __nand_boot_init disable_nand_controller(void __iomem *host)
 {
 	writel(NFCONT_nFCE0, host + NFCONT);
 }
@@ -711,3 +716,56 @@ static int __init s3c_nand_init(void)
 
 device_initcall(s3c_nand_init);
 
+
+#ifdef CONFIG_S5P_NAND_BOOT
+static void __nand_boot_init wait_while_busy(void __iomem *host)
+{
+	while(! (readl(host + NFSTAT) & NFSTAT_READY))
+	{
+	}
+}
+
+void __nand_boot_init s3c_nand_load_image(void *dest, int size)
+{
+	void __iomem *host = (void __iomem *)S3C_NAND_BASE;
+	unsigned int page = 0;
+	unsigned int pagesize = 2048;
+	int i;
+
+	/* Enable the NAND controller */
+	enable_nand_controller(host, 0x141 << 4);
+	
+	/* Reset the NAND device */
+	enable_cs(host);	
+	send_cmd(host, NAND_CMD_RESET);
+	wait_while_busy(host);
+	disable_cs(host);
+
+	/* Read from the NAND device */
+	do {
+		/* Send the address */
+		enable_cs(host);
+		send_cmd(host, NAND_CMD_READ0);
+		send_addr(host, 0); /* collumn part 1 */
+		send_addr(host, 0); /* collumn part 2 */
+		send_addr(host, page * pagesize >> 11);
+		send_addr(host, page * pagesize >> 19);
+		send_addr(host, page * pagesize >> 27);
+		send_cmd(host, NAND_CMD_READSTART);
+		wait_while_busy(host);
+
+		/* Copy one page */
+		for (i = 0; i < pagesize; i++)
+			writeb(readb(host + NFDATA), (void __iomem *)(dest + i));
+		disable_cs(host);
+
+		page++;
+		dest += pagesize;
+		size -= pagesize;
+	} while (size >= 0);
+
+	/* Disable the controller */
+	disable_nand_controller(host);	
+}
+
+#endif

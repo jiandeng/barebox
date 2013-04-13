@@ -93,3 +93,8 @@
 	Load ENV from /dev/env0 (also /dev/nand0.bareboxenv.bb) with loadenv command
 	Updating barebox doesn't change the ENV as it's not in the same partition
 	You may want to erase /dev/env0 or load env.bin to update it
+8.Basic support for NAND BOOT
+	Disable "System Type  --->S3C Features  --->[ ] Booting from NAND" feature, make, dd barebox.s5p to SD card
+	Enable "System Type  --->S3C Features  --->[*] Booting from NAND" feature, make, copy barebox.s5p to tftp directory
+	Boot from SD card, erase /dev/nand0.barebox.bb & cp /mnt/tftp/barebox.nand /dev/nand0.barebox.bb 
+	Boot from NAND

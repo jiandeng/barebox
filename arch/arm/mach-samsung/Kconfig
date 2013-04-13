@@ -182,6 +182,17 @@ config S3C_NAND_BOOT
 	  Add generic support to boot from NAND flash. Image loading will be
 	  skipped if the code is running from NOR or already from SDRAM.
 
+config S5P_NAND_BOOT
+	bool
+	prompt "Booting from NAND"
+	depends on ARCH_S5PCxx
+	select MTD
+	select NAND
+	select NAND_S5PV210
+	help
+	  Add generic support to boot from NAND flash. Image loading will be
+	  skipped if the code is running from NOR or already from SDRAM.
+
 endmenu
 
 endif

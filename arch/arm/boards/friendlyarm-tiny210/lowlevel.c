@@ -65,8 +65,12 @@ void __bare_init reset(void)
 
 	s5p_init_dram_bank_ddr2(S5P_DMC0_BASE, 0x20E00323, 0, 0);
 
+#ifdef CONFIG_S5P_NAND_BOOT
+	s3c_nand_load_image((void*)TEXT_BASE - 16, barebox_image_size + 16);
+#else
 	if (! s5p_irom_load_mmc((void*)TEXT_BASE - 16, 1, (barebox_image_size + 16 + 511) / 512))
 		while (1) { } /* hang */
+#endif
 
 	/* Jump to SDRAM */
 	r = (unsigned)TEXT_BASE;
