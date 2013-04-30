@@ -98,3 +98,52 @@
 	Enable "System Type  --->S3C Features  --->[*] Booting from NAND" feature, make, copy barebox.s5p to tftp directory
 	Boot from SD card, erase /dev/nand0.barebox.bb & cp /mnt/tftp/barebox.nand /dev/nand0.barebox.bb 
 	Boot from NAND
+9.UBI ROOTFS
+	Enable "UBI" & "UBIFS" feature, recompile Kernel
+	Update Barebox & Kernel in the nand flash, boot from nand, update the envfs
+	Attach UBI device on /dev/nand0.system (on the target) 
+		erase /dev/nand0.system && ubiattach /dev/nand0.system
+			Skipping bad block at 0x011a0000
+			Skipping bad block at 0x05040000
+			Skipping bad block at 0x07180000
+			Skipping bad block at 0x08840000
+			Skipping bad block at 0x08ae0000
+			Skipping bad block at 0x0a880000
+			Skipping bad block at 0x0fae0000
+			UBI: attaching mtd0 to ubi0
+			UBI: physical eraseblock size:   131072 bytes (128 KiB)
+			UBI: logical eraseblock size:    129024 bytes
+			UBI: smallest flash I/O unit:    2048
+			UBI: sub-page size:              512
+			UBI: VID header offset:          512 (aligned 512)
+			UBI: data offset:                2048
+			UBI: empty MTD device detected
+			UBI: create volume table (copy #1)
+			UBI: create volume table (copy #2)
+			registering /dev/ubi0
+			UBI: attached mtd0 to ubi0
+			UBI: MTD device name:            "nand0.system"
+			UBI: MTD device size:            242 MiB
+			UBI: number of good PEBs:        1929
+			UBI: number of bad PEBs:         7
+			UBI: max. allowed volumes:       128
+			UBI: wear-leveling threshold:    4096
+			UBI: number of internal volumes: 1
+			UBI: number of user volumes:     0
+			UBI: available PEBs:             1906
+			UBI: total number of reserved PEBs: 23
+			UBI: number of PEBs reserved for bad PEB handling: 19
+			UBI: max/mean erase counter: 1/0
+	Make UBI Volume for ROOTFS (on the target)
+		ubimkvol /dev/ubi0 root 0
+	Make UBI ROOTFS image (on the laptop)
+		sudo apt-get install mtd-utils
+		sudo mkfs.ubifs -r ~/rootfs -m 2048 -e 129024 -c 1906 -o ~/tftp/ubifs.img
+			-m smallest flash I/O unit (page size)
+			-e logical eraseblock size
+			-c available PEBs
+			-r directory containing rootfs source files
+	Write ubifs.img into nand flash (on the target) 
+		cp /mnt/tftp/ubifs.img /dev/ubi0.root
+	Boot from nand flash (on the target)
+		boot ubi
