@@ -54,7 +54,9 @@ int __bare_init s5p_irom_load_mmc(void *dest, uint32_t start_block, uint16_t blo
 void __bare_init barebox_arm_reset_vector(void)
 {
 	uint32_t r;
-
+#ifdef CONFIG_S5P_NAND_BOOT
+	void __bare_init s3c_nand_load_image(void *dest, int size);
+#endif
 	arm_cpu_lowlevel_init();
 
 #ifdef CONFIG_S3C_PLL_INIT
