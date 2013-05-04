@@ -32,14 +32,14 @@
 #include <mach/io.h>
 #include <spi/spi.h>
 
-static struct at91_ether_platform_data ether_pdata = {
-	.is_rmii = 1,
+static struct macb_platform_data ether_pdata = {
+	.phy_interface = PHY_INTERFACE_MODE_RMII,
 	.phy_addr = 0,
 };
 
 static int at91rm9200ek_mem_init(void)
 {
-	at91_add_device_sdram(64 * 1024 * 1024);
+	at91_add_device_sdram(0);
 
 	return 0;
 }
@@ -47,6 +47,7 @@ mem_initcall(at91rm9200ek_mem_init);
 
 static struct at91_usbh_data ek_usbh_data = {
 	.ports		= 2,
+	.vbus_pin	= { -EINVAL, -EINVAL },
 };
 
 #ifdef CONFIG_LED_GPIO

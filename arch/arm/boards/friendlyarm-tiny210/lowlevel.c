@@ -23,6 +23,7 @@
 #include <common.h>
 #include <init.h>
 #include <io.h>
+#include <sizes.h>
 #include <asm/barebox-arm.h>
 #include <asm/barebox-arm-head.h>
 #include <asm/sections.h>
@@ -50,25 +51,26 @@ int __bare_init s5p_irom_load_mmc(void *dest, uint32_t start_block, uint16_t blo
 }
 
 
-void __bare_init reset(void)
+void __bare_init barebox_arm_reset_vector(void)
 {
 	uint32_t r;
 
-	common_reset();
+	arm_cpu_lowlevel_init();
 
 #ifdef CONFIG_S3C_PLL_INIT
 	s5p_init_pll();
 #endif
 
 	if (get_pc() < 0xD0000000) /* Are we running from iRAM? */
-		board_init_lowlevel_return(); /* No, we don't. */
+		/* No, we don't. */
+		barebox_arm_entry(S3C_SDRAM_BASE, SZ_64M, 0);
 
 	s5p_init_dram_bank_ddr2(S5P_DMC0_BASE, 0x20E00323, 0, 0);
 
 #ifdef CONFIG_S5P_NAND_BOOT
-	s3c_nand_load_image((void*)TEXT_BASE - 16, barebox_image_size + 16);
+	s3c_nand_load_image((void*)TEXT_BASE - 16, ld_var(_barebox_image_size) + 16);
 #else
-	if (! s5p_irom_load_mmc((void*)TEXT_BASE - 16, 1, (barebox_image_size + 16 + 511) / 512))
+	if (! s5p_irom_load_mmc((void*)TEXT_BASE - 16, 1, (ld_var(_barebox_image_size) + 16 + 511) / 512))
 		while (1) { } /* hang */
 #endif
 

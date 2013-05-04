@@ -31,7 +31,6 @@
 #include <linux/mtd/nand.h>
 #include <mach/board.h>
 #include <mach/at91sam9_smc.h>
-#include <mach/sam9_smc.h>
 #include <gpio.h>
 #include <mach/io.h>
 #include <mach/at91_pmc.h>
@@ -47,13 +46,14 @@
 
 struct w1_gpio_platform_data w1_pdata = {
 	.pin = AT91_PIN_PB18,
+	.ext_pullup_enable_pin = -EINVAL,
 	.is_open_drain = 0,
 };
 
 static struct atmel_nand_data nand_pdata = {
 	.ale		= 21,
 	.cle		= 22,
-	.det_pin	= 0,
+	.det_pin	= -EINVAL,
 	.rdy_pin	= AT91_PIN_PD5,
 	.enable_pin	= AT91_PIN_PD4,
 	.ecc_mode	= NAND_ECC_HW,
@@ -92,7 +92,7 @@ static void ek_add_device_nand(void)
 		cm_nand_smc_config.mode |= AT91_SMC_DBW_8;
 
 	/* configure chip-select 3 (NAND) */
-	sam9_smc_configure(3, &cm_nand_smc_config);
+	sam9_smc_configure(0, 3, &cm_nand_smc_config);
 
 	if (at91sam9x5ek_cm_is_vendor(VENDOR_COGENT)) {
 		unsigned long csa;
@@ -105,8 +105,8 @@ static void ek_add_device_nand(void)
 	at91_add_device_nand(&nand_pdata);
 }
 
-static struct at91_ether_platform_data macb_pdata = {
-	.is_rmii = 1,
+static struct macb_platform_data macb_pdata = {
+	.phy_interface = PHY_INTERFACE_MODE_RMII,
 	.phy_addr = 0,
 };
 
@@ -118,6 +118,49 @@ static void ek_add_device_eth(void)
 	at91_add_device_eth(0, &macb_pdata);
 }
 
+#if defined(CONFIG_DRIVER_VIDEO_ATMEL_HLCD)
+/*
+ * LCD Controller
+ */
+static struct fb_videomode at91_tft_vga_modes[] = {
+	{
+		.name		= "LG",
+		.refresh	= 60,
+		.xres		= 800,		.yres		= 480,
+		.pixclock	= KHZ2PICOS(33260),
+
+		.left_margin	= 88,		.right_margin	= 168,
+		.upper_margin	= 8,		.lower_margin	= 37,
+		.hsync_len	= 128,		.vsync_len	= 2,
+
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+};
+
+/* Default output mode is TFT 24 bit */
+#define AT91SAM9X5_DEFAULT_LCDCFG5	(LCDC_LCDCFG5_MODE_OUTPUT_24BPP)
+
+/* Driver datas */
+static struct atmel_lcdfb_platform_data ek_lcdc_data = {
+	.lcdcon_is_backlight		= true,
+	.default_bpp			= 16,
+	.default_lcdcon2		= AT91SAM9X5_DEFAULT_LCDCFG5,
+	.guard_time			= 9,
+	.lcd_wiring_mode		= ATMEL_LCDC_WIRING_RGB,
+	.mode_list			= at91_tft_vga_modes,
+	.num_modes			= ARRAY_SIZE(at91_tft_vga_modes),
+};
+
+static void ek_add_device_lcdc(void)
+{
+	at91_add_device_lcdc(&ek_lcdc_data);
+}
+
+#else
+static void ek_add_device_lcdc(void) {}
+#endif
+
 /*
  * MCI (SD/MMC)
  */
@@ -125,13 +168,13 @@ static void ek_add_device_eth(void)
 static struct atmel_mci_platform_data mci0_data = {
 	.bus_width	= 4,
 	.detect_pin	= AT91_PIN_PD15,
-	.wp_pin		= 0,
+	.wp_pin		= -EINVAL,
 };
 
 static void ek_add_device_mci(void)
 {
 	if (at91sam9x5ek_cm_is_vendor(VENDOR_COGENT))
-		mci0_data.detect_pin = 0;
+		mci0_data.detect_pin = -EINVAL;
 
 	/* MMC0 */
 	at91_add_device_mci(0, &mci0_data);
@@ -192,13 +235,23 @@ static void ek_add_device_spi(void)
 	at91_add_device_spi(0, &spi_pdata);
 }
 
+#if defined(CONFIG_USB_OHCI) || defined(CONFIG_USB_EHCI)
 /*
- * USB Host port
+ * USB HS Host port (common to OHCI & EHCI)
  */
-static struct at91_usbh_data __initdata ek_usbh_data = {
-	.ports		= 2,
-	.vbus_pin	= {AT91_PIN_PD20, AT91_PIN_PD19},
+static struct at91_usbh_data ek_usbh_hs_data = {
+	.ports			= 2,
+	.vbus_pin		= {AT91_PIN_PD19, AT91_PIN_PD20},
 };
+
+static void ek_add_device_usb(void)
+{
+	at91_add_device_usbh_ohci(&ek_usbh_hs_data);
+	at91_add_device_usbh_ehci(&ek_usbh_hs_data);
+}
+#else
+static void ek_add_device_usb(void) {}
+#endif
 
 struct gpio_led leds[] = {
 	{
@@ -223,12 +276,12 @@ static void __init ek_add_led(void)
 		at91_set_gpio_output(leds[i].gpio, leds[i].active_low);
 		led_gpio_register(&leds[i]);
 	}
-	led_set_trigger(LED_TRIGGER_HEARTBEAT, &leds[0].led);
+	led_set_trigger(LED_TRIGGER_HEARTBEAT, &leds[1].led);
 }
 
 static int at91sam9x5ek_mem_init(void)
 {
-	at91_add_device_sdram(128 * 1024 * 1024);
+	at91_add_device_sdram(0);
 
 	return 0;
 }
@@ -250,9 +303,10 @@ static int at91sam9x5ek_devices_init(void)
 	ek_add_device_eth();
 	ek_add_device_spi();
 	ek_add_device_mci();
-	at91_add_device_usbh_ohci(&ek_usbh_data);
+	ek_add_device_usb();
 	ek_add_led();
 	ek_add_device_i2c();
+	ek_add_device_lcdc();
 
 	armlinux_set_bootparams((void *)(AT91_CHIPSELECT_1 + 0x100));
 	armlinux_set_architecture(CONFIG_MACH_AT91SAM9X5EK);

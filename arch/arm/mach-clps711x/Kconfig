@@ -5,12 +5,22 @@ choice
 
 config MACH_CLEP7212
 	bool "Cirrus Logic CLEP7212"
-	select MACH_HAS_LOWLEVEL_INIT
-	select MACH_DO_LOWLEVEL_INIT
 	help
 	  Boards based on the Cirrus Logic 7212/7312 CPU.
 
 endchoice
+
+menu "CLPS711X specific settings"
+
+config CLPS711X_RAISE_CPUFREQ
+	bool "Raise CPU frequency to 90 MHz"
+	depends on MACH_CLEP7212
+	help
+	  Raise CPU frequency to 90 MHz. This operation can be performed
+	  only for devices which allow to operate at 90 MHz.
+	  If option is not selected, CPU frequency will set to default 73 MHz.
+
+endmenu
 
 config BOARDINFO
 	default "Cirrus Logic CLEP7212" if MACH_CLEP7212

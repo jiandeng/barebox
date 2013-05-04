@@ -22,13 +22,6 @@ config PROCESS_ESCAPE_SEQUENCE
 
 source lib/lzo/Kconfig
 
-config FDT
-	bool
-
-config OFTREE
-	select FDT
-	bool
-
 config BCH
 	bool
 
@@ -41,6 +34,17 @@ config QSORT
 config XYMODEM
 	bool
 
+config LIBSCAN
+	bool
+
+config LIBUBIGEN
+	bool
+
+config LIBMTD
+	bool
+
 source lib/gui/Kconfig
+
+source lib/bootstrap/Kconfig
 
 endmenu

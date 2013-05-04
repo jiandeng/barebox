@@ -371,6 +371,7 @@ err:
 static int atmel_spi_probe(struct device_d *dev)
 {
 	int ret = 0;
+	int i;
 	struct spi_master *master;
 	struct atmel_spi *as;
 	struct at91_spi_platform_data *pdata = dev->platform_data;
@@ -399,6 +400,12 @@ static int atmel_spi_probe(struct device_d *dev)
 	as->cs_pins = pdata->chipselect;
 	as->regs = dev_request_mem_region(dev, 0);
 
+	for (i = 0; i < master->num_chipselect; i++) {
+		ret = gpio_request(as->cs_pins[i], dev_name(dev));
+		if (ret)
+			goto out_gpio;
+	}
+
 	/* Initialize the hardware */
 	clk_enable(as->clk);
 	spi_writel(as, CR, SPI_BIT(SWRST));
@@ -418,6 +425,7 @@ static int atmel_spi_probe(struct device_d *dev)
 out_reset_hw:
 	spi_writel(as, CR, SPI_BIT(SWRST));
 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
+out_gpio:
 	clk_disable(as->clk);
 	clk_put(as->clk);
 out_free:
@@ -429,11 +437,4 @@ static struct driver_d atmel_spi_driver = {
 	.name  = "atmel_spi",
 	.probe = atmel_spi_probe,
 };
-
-static int atmel_spi_init(void)
-{
-	platform_driver_register(&atmel_spi_driver);
-	return 0;
-}
-
-device_initcall(atmel_spi_init);
+device_platform_driver(atmel_spi_driver);

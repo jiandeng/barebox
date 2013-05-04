@@ -24,13 +24,20 @@
 #include <i2c/i2c.h>
 #include <spi/spi.h>
 #include <linux/mtd/mtd.h>
+#include <fb.h>
+#include <video/atmel_lcdc.h>
+#include <mach/atmel_hlcdc.h>
+#include <linux/phy.h>
+#include <platform_data/macb.h>
 
  /* USB Host */
 struct at91_usbh_data {
 	u8		ports;		/* number of ports on root hub */
-	u8		vbus_pin[2];	/* port power-control pin */
+	int		vbus_pin[2];	/* port power-control pin */
+	u8	vbus_pin_active_low[2];	/* vbus polarity */
 };
 extern void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data);
+extern void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data);
 
 void atmel_nand_load_image(void *dest, int size, int pagesize, int blocksize);
 
@@ -46,9 +53,9 @@ extern void __init at91_add_device_udc(struct at91_udc_data *data);
 
  /* NAND / SmartMedia */
 struct atmel_nand_data {
-	u8		enable_pin;	/* chip enable */
-	u8		det_pin;	/* card detect */
-	u8		rdy_pin;	/* ready/busy */
+	int		enable_pin;	/* chip enable */
+	int		det_pin;	/* card detect */
+	int		rdy_pin;	/* ready/busy */
 	u8		ale;		/* address line number connected to ALE */
 	u8		cle;		/* address line number connected to CLE */
 	u8		bus_width_16;	/* buswidth is 16 bit */
@@ -66,15 +73,7 @@ void at91_add_device_nand(struct atmel_nand_data *data);
  /* Ethernet (EMAC & MACB) */
 #define AT91SAM_ETX2_ETX3_ALTERNATIVE	(1 << 0)
 
-struct at91_ether_platform_data {
-	unsigned int phy_flags;
-	unsigned int flags;
-	int phy_addr;
-	int is_rmii;
-	int (*get_ethaddr)(struct eth_device*, unsigned char *adr);
-};
-
-void at91_add_device_eth(int id, struct at91_ether_platform_data *data);
+void at91_add_device_eth(int id, struct macb_platform_data *data);
 
 void at91_add_device_i2c(short i2c_id, struct i2c_board_info *devices, int nr_devices);
 
@@ -147,9 +146,8 @@ static inline struct device_d * at91_register_uart(unsigned id, unsigned pins)
 struct atmel_mci_platform_data {
 	unsigned slot_b;
 	unsigned bus_width;
-	unsigned host_caps; /* MCI_MODE_* from mci.h */
-	unsigned detect_pin;
-	unsigned wp_pin;
+	int detect_pin;
+	int wp_pin;
 };
 
 void at91_add_device_mci(short mmc_id, struct atmel_mci_platform_data *data);
@@ -161,4 +159,6 @@ struct at91_spi_platform_data {
 };
 
 void at91_add_device_spi(int spi_id, struct at91_spi_platform_data *pdata);
+
+void __init at91_add_device_lcdc(struct atmel_lcdfb_platform_data *data);
 #endif

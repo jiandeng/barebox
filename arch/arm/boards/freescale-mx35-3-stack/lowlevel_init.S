@@ -56,9 +56,9 @@ MPCTL_PARAM_532_W:	.word	MPCTL_PARAM_532
 PPCTL_PARAM_W:		.word	PPCTL_PARAM_300
 CCM_BASE_ADDR_W:	.word	MX35_CCM_BASE_ADDR
 
-.globl reset
-reset:
-	common_reset r0
+.globl barebox_arm_reset_vector
+barebox_arm_reset_vector:
+	arm_cpu_lowlevel_init r0
 
 	mrc	15, 0, r1, c1, c0, 0
 
@@ -126,7 +126,7 @@ reset:
 	cmp	pc, #CSD1_BASE_ADDR
 	bhi	1f
 
-	b	board_init_lowlevel_return
+	b	imx35_barebox_entry
 
 1:
 	ldr	r0, =ESDCTL_BASE_ADDR
@@ -155,33 +155,13 @@ reset:
 	str	r3, [r0, #0x30]
 
 #ifdef CONFIG_NAND_IMX_BOOT
-	ldr	sp, =STACK_BASE + STACK_SIZE - 12		/* Setup a temporary stack in SDRAM */
+	/* Setup a temporary stack in internal SRAM */
+	ldr	sp, =MX35_IRAM_BASE_ADDR + MX35_IRAM_SIZE - 4
 
-	ldr	r0, =MX35_NFC_BASE_ADDR		/* start of NFC SRAM */
-	ldr	r2, =MX35_NFC_BASE_ADDR + 0x800	/* end of NFC SRAM */
-
-	/* skip NAND boot if not running from NFC space */
-	cmp	pc, r0
-	blo	ret
-	cmp	pc, r2
-	bhs	ret
-
-	/* Move ourselves out of NFC SRAM */
-	ldr r1, =_text
-
-copy_loop:
-	ldmia	r0!, {r3-r9}			/* copy from source address [r0] */
-	stmia	r1!, {r3-r9}			/* copy to   target address [r1] */
-	cmp	r0, r2				/* until source end address [r2] */
-	ble	copy_loop
-
-	ldr	pc, =1f				/* Jump to SDRAM */
-1:
-	b	nand_boot			/* Load barebox from NAND Flash */
-ret:
+	b	imx35_barebox_boot_nand_external
 #endif /* CONFIG_NAND_IMX_BOOT */
 
-	b	board_init_lowlevel_return
+	b	imx35_barebox_entry
 
 /*
  * r0: ESDCTL control base, r1: sdram slot base

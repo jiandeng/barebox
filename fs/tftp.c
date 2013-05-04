@@ -246,6 +246,11 @@ static void tftp_parse_oack(struct file_priv *priv, unsigned char *pkt, int len)
 	}
 }
 
+static void tftp_timer_reset(struct file_priv *priv)
+{
+	priv->progress_timeout = priv->resend_timeout = get_time_ns();
+}
+
 static void tftp_handler(void *ctx, char *packet, unsigned len)
 {
 	struct file_priv *priv = ctx;
@@ -282,6 +287,9 @@ static void tftp_handler(void *ctx, char *packet, unsigned len)
 		}
 
 		priv->block++;
+
+		tftp_timer_reset(priv);
+
 		if (priv->state == STATE_LAST) {
 			priv->state = STATE_DONE;
 			break;
@@ -335,6 +343,8 @@ static void tftp_handler(void *ctx, char *packet, unsigned len)
 
 		priv->last_block = priv->block;
 
+		tftp_timer_reset(priv);
+
 		kfifo_put(priv->fifo, pkt + 2, len);
 
 		if (len < priv->blocksize) {
@@ -362,11 +372,6 @@ static void tftp_handler(void *ctx, char *packet, unsigned len)
 		priv->state = STATE_DONE;
 		break;
 	}
-}
-
-static void tftp_timer_reset(struct file_priv *priv)
-{
-	priv->progress_timeout = priv->resend_timeout = get_time_ns();
 }
 
 static struct file_priv *tftp_do_open(struct device_d *dev,
@@ -512,7 +517,7 @@ static int tftp_write(struct device_d *_dev, FILE *f, const void *inbuf,
 	size_t size, now;
 	int ret;
 
-	debug("%s: %d\n", __func__, insize);
+	debug("%s: %zu\n", __func__, insize);
 
 	size = insize;
 
@@ -547,9 +552,7 @@ static int tftp_read(struct device_d *dev, FILE *f, void *buf, size_t insize)
 	size_t outsize = 0, now;
 	int ret;
 
-	debug("%s %d\n", __func__, insize);
-
-	tftp_timer_reset(priv);
+	debug("%s %zu\n", __func__, insize);
 
 	while (insize) {
 		now = kfifo_get(priv->fifo, buf, insize);
@@ -561,10 +564,8 @@ static int tftp_read(struct device_d *dev, FILE *f, void *buf, size_t insize)
 			insize -= now;
 		}
 
-		if (TFTP_FIFO_SIZE - kfifo_len(priv->fifo) >= priv->blocksize) {
+		if (TFTP_FIFO_SIZE - kfifo_len(priv->fifo) >= priv->blocksize)
 			tftp_send(priv);
-			tftp_timer_reset(priv);
-		}
 
 		ret = tftp_poll(priv);
 		if (ret == TFTP_ERR_RESEND)

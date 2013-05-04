@@ -1,3 +1,5 @@
+#define pr_fmt(fmt) "nand: " fmt
+
 #include <common.h>
 #include <errno.h>
 #include <clock.h>
@@ -72,7 +74,7 @@ int nand_default_block_markbad(struct mtd_info *mtd, loff_t ofs)
 		chip->bbt[block >> 2] |= 0x01 << ((block & 0x03) << 1);
 
 	/* Do we have a flash based bad block table ? */
-	if (IS_ENABLED(CONFIG_NAND_BBT) && chip->options & NAND_USE_FLASH_BBT)
+	if (IS_ENABLED(CONFIG_NAND_BBT) && chip->bbt_options & NAND_BBT_USE_FLASH)
 		ret = nand_update_bbt(mtd, ofs);
 	else {
 		/* We write two bytes, so we dont have to mess with 16 bit
@@ -267,7 +269,7 @@ int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	uint32_t writelen = ops->len;
 	uint8_t *oob = ops->oobbuf;
 	uint8_t *buf = ops->datbuf;
-	int ret, subpage;
+	int ret = 0, subpage;
 
 	ops->retlen = 0;
 	if (!writelen)
@@ -296,10 +298,6 @@ int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	    (chip->pagebuf << chip->page_shift) < (to + ops->len))
 		chip->pagebuf = -1;
 
-	/* Initialize to all 0xFF, to avoid the possibility of
-	   left over OOB data from a previous OOB read. */
-	memset(chip->oob_poi, 0xff, mtd->oobsize);
-
 	while(1) {
 		int bytes = mtd->writesize;
 		int cached = writelen > bytes && page != blockmask;
@@ -315,13 +313,19 @@ int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 			wbuf = chip->buffers->databuf;
 		}
 
-		if (unlikely(oob))
+		if (unlikely(oob)) {
 			oob = nand_fill_oob(chip, oob, ops);
+		} else {
+			/* We still need to erase leftover OOB data */
+			memset(chip->oob_poi, 0xff, mtd->oobsize);
+		}
 
-		ret = chip->write_page(mtd, chip, wbuf, page, cached,
-				       (ops->mode == MTD_OOB_RAW));
-		if (ret)
-			break;
+		if (oob || !mtd_all_ff(wbuf, mtd->writesize)) {
+			ret = chip->write_page(mtd, chip, wbuf, page, cached,
+					       (ops->mode == MTD_OOB_RAW));
+			if (ret)
+				break;
+		}
 
 		writelen -= bytes;
 		if (!writelen)
@@ -622,9 +626,10 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 		/*
 		 * heck if we have a bad block, we do not erase bad blocks !
 		 */
-		if (nand_block_checkbad(mtd, ((loff_t) page) <<
+		if (!mtd->allow_erasebad &&
+				nand_block_checkbad(mtd, ((loff_t) page) <<
 					chip->page_shift, 0, allowbbt)) {
-			printk(KERN_WARNING "nand_erase: attempt to erase a "
+			pr_warn("nand_erase: attempt to erase a "
 			       "bad block at page 0x%08x\n", page);
 			instr->state = MTD_ERASE_FAILED;
 			goto erase_exit;

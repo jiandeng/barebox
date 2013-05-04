@@ -50,26 +50,26 @@
 #include "ccxmx51.h"
 
 static struct ccxmx51_ident ccxmx51_ids[] = {
-/* 0x00 */	{ "Unknown",						0,       0, 0, 0, 0 },
-/* 0x01 */	{ "Not supported",					0,       0, 0, 0, 0 },
-/* 0x02 */	{ "i.MX515@800MHz, Wireless, PHY, Ext. Eth, Accel",	SZ_512M, 0, 1, 1, 1 },
-/* 0x03 */	{ "i.MX515@800MHz, PHY, Ext. Eth, Accel",		SZ_512M, 0, 1, 1, 0 },
-/* 0x04 */	{ "i.MX515@600MHz, Wireless, PHY, Ext. Eth, Accel",	SZ_512M, 1, 1, 1, 1 },
-/* 0x05 */	{ "i.MX515@600MHz, PHY, Ext. Eth, Accel",		SZ_512M, 1, 1, 1, 0 },
-/* 0x06 */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		SZ_512M, 0, 1, 0, 1 },
-/* 0x07 */	{ "i.MX515@800MHz, PHY, Accel",				SZ_512M, 0, 1, 0, 0 },
-/* 0x08 */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		SZ_256M, 0, 1, 0, 1 },
-/* 0x09 */	{ "i.MX515@800MHz, PHY, Accel",				SZ_256M, 0, 1, 0, 0 },
-/* 0x0a */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		SZ_256M, 1, 1, 0, 1 },
-/* 0x0b */	{ "i.MX515@600MHz, PHY, Accel",				SZ_256M, 1, 1, 0, 0 },
-/* 0x0c */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		SZ_128M, 0, 1, 0, 1 },
-/* 0x0d */	{ "i.MX512@800MHz",					SZ_128M, 0, 0, 0, 0 },
-/* 0x0e */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		SZ_512M, 0, 1, 0, 1 },
-/* 0x0f */	{ "i.MX515@600MHz, PHY, Accel",				SZ_128M, 1, 1, 0, 0 },
-/* 0x10 */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		SZ_128M, 1, 1, 0, 1 },
-/* 0x11 */	{ "i.MX515@800MHz, PHY, Accel",				SZ_128M, 0, 1, 0, 0 },
-/* 0x12 */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		SZ_512M, 1, 1, 0, 1 },
-/* 0x13 */	{ "i.MX515@800MHz, PHY, Accel",				SZ_512M, 0, 1, 0, 0 },
+/* 0x00 */	{ "Unknown",						0, 0, 0, 0 },
+/* 0x01 */	{ "Not supported",					0, 0, 0, 0 },
+/* 0x02 */	{ "i.MX515@800MHz, Wireless, PHY, Ext. Eth, Accel",	0, 1, 1, 1 },
+/* 0x03 */	{ "i.MX515@800MHz, PHY, Ext. Eth, Accel",		0, 1, 1, 0 },
+/* 0x04 */	{ "i.MX515@600MHz, Wireless, PHY, Ext. Eth, Accel",	1, 1, 1, 1 },
+/* 0x05 */	{ "i.MX515@600MHz, PHY, Ext. Eth, Accel",		1, 1, 1, 0 },
+/* 0x06 */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		0, 1, 0, 1 },
+/* 0x07 */	{ "i.MX515@800MHz, PHY, Accel",				0, 1, 0, 0 },
+/* 0x08 */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		0, 1, 0, 1 },
+/* 0x09 */	{ "i.MX515@800MHz, PHY, Accel",				0, 1, 0, 0 },
+/* 0x0a */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		1, 1, 0, 1 },
+/* 0x0b */	{ "i.MX515@600MHz, PHY, Accel",				1, 1, 0, 0 },
+/* 0x0c */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		0, 1, 0, 1 },
+/* 0x0d */	{ "i.MX512@800MHz",					0, 0, 0, 0 },
+/* 0x0e */	{ "i.MX515@800MHz, Wireless, PHY, Accel",		0, 1, 0, 1 },
+/* 0x0f */	{ "i.MX515@600MHz, PHY, Accel",				1, 1, 0, 0 },
+/* 0x10 */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		1, 1, 0, 1 },
+/* 0x11 */	{ "i.MX515@800MHz, PHY, Accel",				0, 1, 0, 0 },
+/* 0x12 */	{ "i.MX515@600MHz, Wireless, PHY, Accel",		1, 1, 0, 1 },
+/* 0x13 */	{ "i.MX515@800MHz, PHY, Accel",				0, 1, 0, 0 },
 };
 
 struct ccxmx51_ident *ccxmx51_id;
@@ -80,12 +80,10 @@ struct imx_nand_platform_data nand_info = {
 	.flash_bbt	= 1,
 };
 
-#ifdef CONFIG_DRIVER_NET_FEC_IMX
 static struct fec_platform_data fec_info = {
-	.xcv_type	= MII100,
+	.xcv_type	= PHY_INTERFACE_MODE_MII,
 	.phy_addr	= 7,
 };
-#endif
 
 static iomux_v3_cfg_t ccxmx51_pads[] = {
 	/* UART1 */
@@ -197,51 +195,11 @@ static const struct spi_board_info ccxmx51_spi_board_info[] = {
 	},
 };
 
-static void ccxmx51_otghost_init(void)
-{
-#define MX51_USBOTHER_REGS_OFFSET		0x800
-#define MX51_USBCTRL_OFFSET			0x0
-#define MX51_USB_PHY_CTR_FUNC_OFFSET		0x8
-#define MX51_USB_PHY_CTR_FUNC2_OFFSET		0xc
-#define MX51_USB_UTMI_PHYCTRL1_PLLDIV_MASK	0x3
-#define MX51_USB_PLL_DIV_19_2_MHZ		0x00
-#define MX51_USB_PLL_DIV_24_MHZ			0x01
-#define MX51_USB_PLL_DIV_26_MHZ			0x02
-#define MX51_USB_PLL_DIV_27_MHZ			0x03
-#define MX51_OTG_PHYCTRL_OC_DIS_BIT		(1 << 8)
-#define MX51_OTG_UCTRL_OWIE_BIT			(1 << 27)
-#define MX51_OTG_UCTRL_OPM_BIT			(1 << 24)
-
-#define USBOTHER_BASE				(MX51_OTG_BASE_ADDR + MX51_USBOTHER_REGS_OFFSET)
-
-	u32 reg;
-
-	/* Set sysclock to 24 MHz */
-	reg = readl(USBOTHER_BASE + MX51_USB_PHY_CTR_FUNC2_OFFSET);
-	reg &= ~MX51_USB_UTMI_PHYCTRL1_PLLDIV_MASK;
-	reg |= MX51_USB_PLL_DIV_24_MHZ;
-	writel(reg, USBOTHER_BASE + MX51_USB_PHY_CTR_FUNC2_OFFSET);
-
-	/* OC is not used */
-	reg = readl(USBOTHER_BASE + MX51_USB_PHY_CTR_FUNC_OFFSET);
-	reg |= MX51_OTG_PHYCTRL_OC_DIS_BIT;
-	writel(reg, USBOTHER_BASE + MX51_USB_PHY_CTR_FUNC_OFFSET);
-
-	/* Power pins enable */
-	reg = readl(USBOTHER_BASE + MX51_USBCTRL_OFFSET);
-	reg |= MX51_OTG_UCTRL_OWIE_BIT | MX51_OTG_UCTRL_OPM_BIT;
-	writel(reg, USBOTHER_BASE + MX51_USBCTRL_OFFSET);
-
-	/* Setup PORTSC */
-	reg = readl(MX51_OTG_BASE_ADDR + 0x184);
-	reg &= ~(3 << 30);
-	reg |= 1 << 28;
-	writel(reg, MX51_OTG_BASE_ADDR + 0x184);
-
-	mdelay(10);
-
-	add_generic_usb_ehci_device(0, MX51_OTG_BASE_ADDR, NULL);
-}
+static struct imxusb_platformdata ccxmx51_otg_pdata = {
+	.flags	= MXC_EHCI_MODE_UTMI_16_BIT | MXC_EHCI_INTERNAL_PHY |
+		  MXC_EHCI_POWER_PINS_ENABLED,
+	.mode	= IMX_USB_MODE_HOST,
+};
 
 static int ccxmx51_power_init(void)
 {
@@ -363,12 +321,14 @@ static int ccxmx51_power_init(void)
 	/* De-assert reset of external devices on GP01, GPO2, GPO3 and GPO4 */
 	mc13xxx_reg_read(mc13xxx_dev, MC13892_REG_POWER_MISC, &val);
 	/* GPO1 - External */
-	/* GP02 - LAN9221  */
-	/* GP03 - FEC      */
-	/* GP04 - Wireless */
-	if (IS_ENABLED(CONFIG_DRIVER_NET_SMC911X) && ccxmx51_id->eth0)
+	/* GP02 - LAN9221 Power */
+	/* GP03 - FEC Reset */
+	/* GP04 - Wireless Power */
+	if (IS_ENABLED(CONFIG_DRIVER_NET_SMC911X) && ccxmx51_id->eth1) {
 		val |= (1 << 8);
-	if (IS_ENABLED(CONFIG_DRIVER_NET_FEC_IMX) && ccxmx51_id->eth1)
+		mdelay(50);
+	}
+	if (IS_ENABLED(CONFIG_DRIVER_NET_FEC_IMX) && ccxmx51_id->eth0)
 		val |= (1 << 10);
 	if (ccxmx51_id->wless)
 		val |= (1 << 12);
@@ -392,7 +352,7 @@ static int ccxmx51_devices_init(void)
 	printf("Module Variant: %s (0x%02x)\n", ccxmx51_id->id_string, hwid[0]);
 
 	if (hwid[0]) {
-		printf("Module HW Rev : %02x\n", hwid[1]);
+		printf("Module HW Rev : %02x\n", hwid[1] + 1);
 		switch (hwid[2] & 0xc0) {
 		case 0x00:
 			manloc = 'B';
@@ -408,8 +368,6 @@ static int ccxmx51_devices_init(void)
 			break;
 		}
 		printf("Module Serial : %c%d\n", manloc, ((hwid[2] & 0x3f) << 24) | (hwid[3] << 16) | (hwid[4] << 8) | hwid[5]);
-		if ((ccxmx51_id->mem_sz - SZ_128M) > 0)
-			arm_add_mem_device("ram1", MX51_CSD0_BASE_ADDR + SZ_128M, ccxmx51_id->mem_sz - SZ_128M);
 	}
 
 	imx51_add_uart1();
@@ -433,15 +391,12 @@ static int ccxmx51_devices_init(void)
 	devfs_add_partition("nand0", 0x80000, 0x40000, DEVFS_PARTITION_FIXED, "env_raw");
 	dev_add_bb_dev("env_raw", "env0");
 
-#ifdef CONFIG_DRIVER_NET_FEC_IMX
-	if (ccxmx51_id->eth0 && !pwr) {
-		imx51_add_fec(&fec_info);
+	if (IS_ENABLED(CONFIG_DRIVER_NET_FEC_IMX) && ccxmx51_id->eth0 && !pwr) {
 		eth_register_ethaddr(0, hwid);
+		imx51_add_fec(&fec_info);
 	}
-#endif
 
-#ifdef CONFIG_DRIVER_NET_SMC911X
-	if (ccxmx51_id->eth1 && !pwr) {
+	if (IS_ENABLED(CONFIG_DRIVER_NET_SMC911X) && ccxmx51_id->eth1 && !pwr) {
 		/* Configure the WEIM CS5 timming, bus width, etc */
 		/* 16 bit on DATA[31..16], not multiplexed, async */
 		writel(0x00420081, MX51_WEIM_BASE_ADDR + WEIM_CSxGCR1(5));
@@ -457,9 +412,8 @@ static int ccxmx51_devices_init(void)
 		/* LAN9221 network controller */
 		add_generic_device("smc911x", 1, NULL, MX51_CS5_BASE_ADDR, SZ_4K, IORESOURCE_MEM, NULL);
 	}
-#endif
 
-	ccxmx51_otghost_init();
+	imx51_add_usbotg(&ccxmx51_otg_pdata);
 
 	armlinux_set_bootparams((void *)(MX51_CSD0_BASE_ADDR + 0x100));
 

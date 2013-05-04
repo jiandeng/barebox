@@ -12,6 +12,7 @@ hostprogs-$(CONFIG_ARCH_NETX)    += gen_netx_image
 hostprogs-$(CONFIG_ARCH_OMAP)    += omap_signGP mk-am35xx-spi-image
 hostprogs-$(CONFIG_ARCH_S5PCxx)  += s5p_cksum
 hostprogs-$(CONFIG_ARCH_DAVINCI) += mkublheader
+hostprogs-$(CONFIG_ARCH_ZYNQ)	 += zynq_mkimage
 
 HOSTLOADLIBES_omap4_usbboot = -lpthread
 omap4_usbboot-objs               := usb_linux.o omap4_usbboot.o
@@ -33,3 +34,5 @@ obj-$(CONFIG_BAREBOXENV_TARGET)	+= bareboxenv-target
 
 scripts/bareboxenv-target: scripts/bareboxenv.c FORCE
 	$(call if_changed_dep,csingle)
+
+subdir-$(CONFIG_DTC)         += dtc

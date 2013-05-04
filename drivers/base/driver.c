@@ -135,7 +135,7 @@ int register_device(struct device_d *new_device)
 
 	if (new_device->bus) {
 		if (!new_device->parent)
-			new_device->parent = &new_device->bus->dev;
+			new_device->parent = new_device->bus->dev;
 
 		list_add_tail(&new_device->bus_list, &new_device->bus->device_list);
 
@@ -230,7 +230,7 @@ int register_driver(struct driver_d *drv)
 }
 EXPORT_SYMBOL(register_driver);
 
-static struct resource *dev_get_resource(struct device_d *dev, int num)
+struct resource *dev_get_resource(struct device_d *dev, int num)
 {
 	int i, n = 0;
 

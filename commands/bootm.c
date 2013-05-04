@@ -34,7 +34,6 @@
 #include <errno.h>
 #include <boot.h>
 #include <of.h>
-#include <libfdt.h>
 #include <rtc.h>
 #include <init.h>
 #include <of.h>
@@ -138,13 +137,10 @@ static int bootm_open_initrd_uimage(struct image_data *data)
 static int bootm_open_oftree(struct image_data *data, const char *oftree, int num)
 {
 	enum filetype ft;
-	struct fdt_header *fdt, *fixfdt;
-	int ret;
+	struct fdt_header *fdt;
 	size_t size;
-	unsigned int align;
 
-	if (bootm_verbose(data))
-		printf("Loading oftree from '%s'\n", oftree);
+	printf("Loading devicetree from '%s'\n", oftree);
 
 	ft = file_name_detect_type(oftree);
 	if ((int)ft < 0) {
@@ -190,36 +186,15 @@ static int bootm_open_oftree(struct image_data *data, const char *oftree, int nu
 				file_type_to_string(ft));
 	}
 
-	/*
-	 * ARM Linux uses a single 1MiB section (with 1MiB alignment)
-	 * for mapping the devicetree, so we are not allowed to cross
-	 * 1MiB boundaries.
-	 */
-	align = 1 << fls(size + OFTREE_SIZE_INCREASE - 1);
-
-	fixfdt = xmemalign(align, size + OFTREE_SIZE_INCREASE);
-	memcpy(fixfdt, fdt, size);
-
-
-	ret = fdt_open_into(fdt, fixfdt, size + OFTREE_SIZE_INCREASE);
+	data->of_root_node = of_unflatten_dtb(NULL, fdt);
+	if (!data->of_root_node) {
+		pr_err("unable to unflatten devicetree\n");
+		return -EINVAL;
+	}
 
 	free(fdt);
 
-	if (ret) {
-		printf("unable to parse %s\n", oftree);
-		return -ENODEV;
-	}
-
-	ret = of_fix_tree(fixfdt);
-	if (ret)
-		return ret;
-
-	if (bootm_verbose(data) > 1)
-		fdt_print(fixfdt, "/");
-
-	data->oftree = fixfdt;
-
-	return ret;
+	return 0;
 }
 #endif
 
@@ -380,13 +355,14 @@ static int do_bootm(int argc, char *argv[])
 		}
 	}
 
+	printf("\nLoading OS %s '%s'", file_type_to_string(os_type),
+			data.os_file);
+	if (os_type == filetype_uimage &&
+			data.os->header.ih_type == IH_TYPE_MULTI)
+		printf(", multifile image %d", data.os_num);
+	printf("\n");
+
 	if (bootm_verbose(&data)) {
-		printf("\nLoading OS %s '%s'", file_type_to_string(os_type),
-				data.os_file);
-		if (os_type == filetype_uimage &&
-				data.os->header.ih_type == IH_TYPE_MULTI)
-			printf(", multifile image %d", data.os_num);
-		printf("\n");
 		if (data.os_res)
 			printf("OS image is at 0x%08x-0x%08x\n",
 					data.os_res->start,
@@ -420,7 +396,15 @@ static int do_bootm(int argc, char *argv[])
 		ret = bootm_open_oftree(&data, oftree, oftree_num);
 		if (ret)
 			goto err_out;
+	} else {
+		data.of_root_node = of_get_root_node();
+		if (bootm_verbose(&data) && data.of_root_node)
+			printf("using internal devicetree\n");
 	}
+
+
+	if (bootm_verbose(&data) > 1 && data.of_root_node)
+		of_print_nodes(data.of_root_node, 0);
 #endif
 	if (data.os_address == UIMAGE_SOME_ADDRESS)
 		data.os_address = UIMAGE_INVALID_ADDRESS;

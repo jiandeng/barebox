@@ -25,6 +25,9 @@
 
 void at91_add_device_sdram(u32 size)
 {
+	if (!size)
+		size = at91rm9200_get_sdram_size();
+
 	arm_add_mem_device("ram0", AT91_CHIPSELECT_1, size);
 	add_mem_device("sram0", AT91RM9200_SRAM_BASE, AT91RM9200_SRAM_SIZE,
 			IORESOURCE_MEM_WRITEABLE);
@@ -37,8 +40,17 @@ void at91_add_device_sdram(u32 size)
 #if defined(CONFIG_USB_OHCI)
 void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
 {
+	int i;
+
 	if (!data)
 		return;
+
+	/* Enable VBus control for UHP ports */
+	for (i = 0; i < data->ports; i++) {
+		if (gpio_is_valid(data->vbus_pin[i]))
+			at91_set_gpio_output(data->vbus_pin[i],
+					     data->vbus_pin_active_low[i]);
+	}
 
 	add_generic_device("at91_ohci", DEVICE_ID_DYNAMIC, NULL, AT91RM9200_UHP_BASE,
 			1024 * 1024, IORESOURCE_MEM, data);
@@ -54,12 +66,12 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data) {}
 #ifdef CONFIG_USB_GADGET_DRIVER_AT91
 void __init at91_add_device_udc(struct at91_udc_data *data)
 {
-	if (data->vbus_pin > 0) {
+	if (gpio_is_valid(data->vbus_pin)) {
 		at91_set_gpio_input(data->vbus_pin, 0);
 		at91_set_deglitch(data->vbus_pin, 1);
 	}
 
-	if (data->pullup_pin > 0)
+	if (gpio_is_valid(data->pullup_pin))
 		at91_set_gpio_output(data->pullup_pin, 0);
 
 	add_generic_device("at91_udc", DEVICE_ID_DYNAMIC, NULL, AT91RM9200_BASE_UDP,
@@ -74,7 +86,7 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
  * -------------------------------------------------------------------- */
 
 #if defined(CONFIG_DRIVER_NET_AT91_ETHER)
-void __init at91_add_device_eth(int id, struct at91_ether_platform_data *data)
+void __init at91_add_device_eth(int id, struct macb_platform_data *data)
 {
 	if (!data)
 		return;
@@ -91,7 +103,7 @@ void __init at91_add_device_eth(int id, struct at91_ether_platform_data *data)
 	at91_set_A_periph(AT91_PIN_PA8, 0);	/* ETXEN */
 	at91_set_A_periph(AT91_PIN_PA7, 0);	/* ETXCK_EREFCK */
 
-	if (!data->is_rmii) {
+	if (data->phy_interface != PHY_INTERFACE_MODE_RMII) {
 		at91_set_B_periph(AT91_PIN_PB19, 0);	/* ERXCK */
 		at91_set_B_periph(AT91_PIN_PB18, 0);	/* ECOL */
 		at91_set_B_periph(AT91_PIN_PB17, 0);	/* ERXDV */
@@ -106,7 +118,7 @@ void __init at91_add_device_eth(int id, struct at91_ether_platform_data *data)
 			   IORESOURCE_MEM, data);
 }
 #else
-void __init at91_add_device_eth(int id, struct at91_ether_platform_data *data) {}
+void __init at91_add_device_eth(int id, struct macb_platform_data *data) {}
 #endif
 
 /* --------------------------------------------------------------------
@@ -134,15 +146,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
 	);
 
 	/* enable pin */
-	if (data->enable_pin)
+	if (gpio_is_valid(data->enable_pin))
 		at91_set_gpio_output(data->enable_pin, 1);
 
 	/* ready/busy pin */
-	if (data->rdy_pin)
+	if (gpio_is_valid(data->rdy_pin))
 		at91_set_gpio_input(data->rdy_pin, 1);
 
 	/* card detect pin */
-	if (data->det_pin)
+	if (gpio_is_valid(data->det_pin))
 		at91_set_gpio_input(data->det_pin, 1);
 
 	at91_set_A_periph(AT91_PIN_PC1, 0);		/* SMOE */

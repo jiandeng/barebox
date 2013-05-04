@@ -1,4 +1,5 @@
 menu "serial drivers"
+	depends on !CONSOLE_NONE
 
 config DRIVER_SERIAL_ARM_DCC
 	depends on ARM
@@ -21,7 +22,11 @@ config DRIVER_SERIAL_IMX
 config DRIVER_SERIAL_STM378X
 	depends on ARCH_MXS
 	default y
-	bool "i.MX23/i.MX28 serial driver"
+	bool "i.MX23/i.MX28 debug UART serial driver"
+
+config DRIVER_SERIAL_AUART
+	depends on ARCH_MXS
+	bool "i.MX23/i.MX28 application UART serial driver"
 
 config DRIVER_SERIAL_NETX
 	depends on ARCH_NETX
@@ -111,5 +116,10 @@ config DRIVER_SERIAL_OMAP4_USBBOOT
 	depends on OMAP4_USBBOOT
 	help
 	  Enable this to get console support over the usb bus used to boot an OMAP4
+
+config DRIVER_SERIAL_CADENCE
+	bool "Cadence UART driver"
+	help
+	  Say Y here if you have a Cadence serial IP core.
 
 endmenu

@@ -20,7 +20,7 @@
  * MA 02111-1307 USA
  *
  */
-
+#include <sizes.h>
 #include <asm-generic/barebox.lds.h>
 #include <asm-generic/memory_layout.h>
 
@@ -29,7 +29,11 @@ OUTPUT_ARCH(arm)
 ENTRY(pbl_start)
 SECTIONS
 {
-	. = HEAD_TEXT_BASE;
+#ifdef CONFIG_PBL_RELOCATABLE
+	. = 0x0;
+#else
+	. = TEXT_BASE - SZ_2M;
+#endif
 
 	PRE_IMAGE
 
@@ -58,6 +62,18 @@ SECTIONS
 	. = ALIGN(4);
 	.data : { *(.data*) }
 
+	.rel.dyn : {
+		__rel_dyn_start = .;
+		*(.rel*)
+		__rel_dyn_end = .;
+	}
+
+	.dynsym : {
+		__dynsym_start = .;
+		*(.dynsym)
+		__dynsym_end = .;
+	}
+
 	. = ALIGN(4);
 	__bss_start = .;
 	.bss : { *(.bss*) }
@@ -71,6 +87,6 @@ SECTIONS
 	}
 	__piggydata_end = .;
 
-	_barebox_image_size = __piggydata_end - HEAD_TEXT_BASE;
-	_barebox_pbl_size = __bss_start - HEAD_TEXT_BASE;
+	_barebox_image_size = __piggydata_end - (TEXT_BASE - SZ_2M);
+	_barebox_pbl_size = __bss_start - (TEXT_BASE - SZ_2M);
 }

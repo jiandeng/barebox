@@ -1,9 +1,3 @@
-# atmel_usart.o
-# ns9750_serial.o
-# s3c4510b_uart.o
-# serial_max3100.o
-# serial_pl010.o
-# serial_xuartlite.o
 obj-$(CONFIG_DRIVER_SERIAL_ARM_DCC)		+= arm_dcc.o
 obj-$(CONFIG_SERIAL_AMBA_PL011)			+= amba-pl011.o
 obj-$(CONFIG_DRIVER_SERIAL_IMX)			+= serial_imx.o
@@ -21,3 +15,5 @@ obj-$(CONFIG_DRIVER_SERIAL_ALTERA)		+= serial_altera.o
 obj-$(CONFIG_DRIVER_SERIAL_ALTERA_JTAG)		+= serial_altera_jtag.o
 obj-$(CONFIG_DRIVER_SERIAL_PXA)			+= serial_pxa.o
 obj-$(CONFIG_DRIVER_SERIAL_OMAP4_USBBOOT)	+= serial_omap4_usbboot.o
+obj-$(CONFIG_DRIVER_SERIAL_AUART)		+= serial_auart.o
+obj-$(CONFIG_DRIVER_SERIAL_CADENCE)		+= serial_cadence.o

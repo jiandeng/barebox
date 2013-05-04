@@ -408,7 +408,8 @@ static int m25p80_write(struct mtd_info *mtd, loff_t to, size_t len,
 	struct spi_transfer t[2];
 	struct spi_message m;
 
-	debug("m25p80_write %ld bytes at 0x%08lX\n", (unsigned long)count, offset);
+	dev_dbg(&flash->spi->dev, "m25p80_write %ld bytes at 0x%08llx\n",
+			(unsigned long)len, to);
 
 	spi_message_init(&m);
 	memset(t, 0, (sizeof t));
@@ -484,7 +485,7 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 	size_t actual;
 	int cmd_sz, ret;
 
-	pr_debug("%s: %s to 0x%08x, len %zd\n", dev_name(&flash->spi->dev),
+	dev_dbg(&flash->spi->dev, "%s to 0x%08x, len %zd\n",
 			__func__, (u32)to, len);
 
 	spi_message_init(&m);
@@ -742,6 +743,7 @@ static const struct spi_device_id m25p_ids[] = {
 	{ "w25x64", INFO(0xef3017, 0, 64 * 1024, 128, SECT_4K) },
 	{ "w25q64", INFO(0xef4017, 0, 64 * 1024, 128, SECT_4K) },
 	{ "w25q80", INFO(0xef5014, 0, 64 * 1024,  16, SECT_4K) },
+	{ "w25q80bl", INFO(0xef4014, 0, 64 * 1024,  16, SECT_4K) },
 
 	/* Catalyst / On Semiconductor -- non-JEDEC */
 	{ "cat25c11", CAT25_INFO(  16, 8, 16, 1) },
@@ -767,7 +769,7 @@ static const struct spi_device_id *jedec_probe(struct spi_device *spi)
 	 */
 	tmp = spi_write_then_read(spi, &code, 1, id, 5);
 	if (tmp < 0) {
-		pr_debug("%s: error %d reading JEDEC ID\n",
+		dev_dbg(&spi->dev, "%s: error %d reading JEDEC ID\n",
 				dev_name(&spi->dev), tmp);
 		return ERR_PTR(tmp);
 	}
@@ -923,7 +925,7 @@ static int m25p_probe(struct device_d *dev)
 	dev_info(dev, "%s (%lld Kbytes)\n", id->name,
 			(long long)flash->mtd.size >> 10);
 
-	pr_debug("mtd .name = %s, .size = 0x%llx (%lldMiB) "
+	dev_dbg(dev, "mtd .name = %s, .size = 0x%llx (%lldMiB) "
 			".erasesize = 0x%.8x (%uKiB) .numeraseregions = %d\n",
 		flash->mtd.name,
 		(long long)flash->mtd.size, (long long)(flash->mtd.size >> 20),
@@ -932,7 +934,7 @@ static int m25p_probe(struct device_d *dev)
 
 	if (flash->mtd.numeraseregions)
 		for (i = 0; i < flash->mtd.numeraseregions; i++)
-			pr_debug("mtd.eraseregions[%d] = { .offset = 0x%llx, "
+			dev_dbg(dev, "mtd.eraseregions[%d] = { .offset = 0x%llx, "
 				".erasesize = 0x%.8x (%uKiB), "
 				".numblocks = %d }\n",
 				i, (long long)flash->mtd.eraseregions[i].offset,
@@ -949,12 +951,7 @@ static struct driver_d m25p80_driver = {
 	.name	= "m25p80",
 	.probe	= m25p_probe,
 };
-
-static int m25p80_init(void)
-{
-	return spi_register_driver(&m25p80_driver);
-}
-device_initcall(m25p80_init);
+device_spi_driver(m25p80_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mike Lavender");

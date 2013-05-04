@@ -29,6 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <asm/common.h>
+#include <printk.h>
 
 /*
  * sanity check. The Linux Kernel defines only one of __LITTLE_ENDIAN and
@@ -47,22 +48,6 @@
 #if !defined __LITTLE_ENDIAN && !defined __BIG_ENDIAN
 #error "None of __LITTLE_ENDIAN and __BIG_ENDIAN are defined"
 #endif
-
-#define pr_info(fmt, arg...)	printf(fmt, ##arg)
-#define pr_notice(fmt, arg...)	printf(fmt, ##arg)
-#define pr_err(fmt, arg...)	printf(fmt, ##arg)
-#define pr_warning(fmt, arg...)	printf(fmt, ##arg)
-#define pr_crit(fmt, arg...)	printf(fmt, ##arg)
-#define pr_alert(fmt, arg...)	printf(fmt, ##arg)
-#define pr_emerg(fmt, arg...)	printf(fmt, ##arg)
-
-#ifdef DEBUG
-#define pr_debug(fmt, arg...)	printf(fmt, ##arg)
-#else
-#define pr_debug(fmt, arg...)	do {} while(0)
-#endif
-
-#define debug(fmt, arg...)	pr_debug(fmt, ##arg)
 
 #define BUG() do { \
 	printf("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __FUNCTION__); \
@@ -105,7 +90,7 @@ void reginfo(void);
 void __noreturn hang (void);
 void __noreturn panic(const char *fmt, ...);
 
-char *size_human_readable(ulong size);
+char *size_human_readable(unsigned long long size);
 
 /* common/main.c */
 int	run_command	(const char *cmd, int flag);
@@ -159,7 +144,13 @@ int parse_area_spec(const char *str, loff_t *start, loff_t *size);
 unsigned long strtoul_suffix(const char *str, char **endp, int base);
 unsigned long long strtoull_suffix(const char *str, char **endp, int base);
 
-void start_barebox(void);
+/*
+ * Function pointer to the main barebox function. Defaults
+ * to run_shell() when a shell is enabled.
+ */
+extern int (*barebox_main)(void);
+
+void __noreturn start_barebox(void);
 void shutdown_barebox(void);
 
 /*
@@ -225,6 +216,8 @@ int run_shell(void);
 
 #define PAGE_SIZE	4096
 #define PAGE_SHIFT	12
+#define PAGE_ALIGN(s) (((s) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+#define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
 
 int memory_display(char *addr, loff_t offs, ulong nbytes, int size, int swab);
 

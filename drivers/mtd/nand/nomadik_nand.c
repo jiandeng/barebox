@@ -221,7 +221,7 @@ static int nomadik_nand_probe(struct device_d *dev)
 	}
 
 	pr_info("Registering %s as whole device\n", mtd->name);
-	add_mtd_device(mtd, "nand");
+	add_mtd_nand_device(mtd, "nand");
 
 	return 0;
 
@@ -234,14 +234,7 @@ static struct driver_d nomadik_nand_driver = {
 	.probe = nomadik_nand_probe,
 	.name = "nomadik_nand",
 };
-
-static int __init nand_nomadik_init(void)
-{
-	pr_info("Nomadik NAND driver\n");
-	return platform_driver_register(&nomadik_nand_driver);
-}
-
-device_initcall(nand_nomadik_init);
+device_platform_driver(nomadik_nand_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("ST Microelectronics (sachin.verma@st.com)");

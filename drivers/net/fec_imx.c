@@ -26,6 +26,7 @@
 #include <linux/phy.h>
 #include <linux/clk.h>
 #include <linux/err.h>
+#include <of_net.h>
 
 #include <asm/mmu.h>
 
@@ -86,7 +87,7 @@ static int fec_miibus_read(struct mii_bus *bus, int phyAddr, int regAddr)
 	start = get_time_ns();
 	while (!(readl(fec->regs + FEC_IEVENT) & FEC_IEVENT_MII)) {
 		if (is_timeout(start, MSECOND)) {
-			printf("Read MDIO failed...\n");
+			dev_err(&fec->edev.dev, "Read MDIO failed...\n");
 			return -1;
 		}
 	}
@@ -126,7 +127,7 @@ static int fec_miibus_write(struct mii_bus *bus, int phyAddr,
 	start = get_time_ns();
 	while (!(readl(fec->regs + FEC_IEVENT) & FEC_IEVENT_MII)) {
 		if (is_timeout(start, MSECOND)) {
-			printf("Write MDIO failed...\n");
+			dev_err(&fec->edev.dev, "Write MDIO failed...\n");
 			return -1;
 		}
 	}
@@ -298,18 +299,17 @@ static int fec_init(struct eth_device *dev)
 	 * Set FEC-Lite receive control register(R_CNTRL):
 	 */
 	rcntl = FEC_R_CNTRL_MAX_FL(1518);
-	if (fec->xcv_type != SEVENWIRE) {
-		rcntl |= FEC_R_CNTRL_MII_MODE;
-		/*
-		 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
-		 * and do not drop the Preamble.
-		 */
-		writel(((fec_clk_get_rate(fec) >> 20) / 5) << 1,
-				fec->regs + FEC_MII_SPEED);
-	}
 
-	if (fec->xcv_type == RMII) {
-		if (fec_is_imx28(fec)) {
+	rcntl |= FEC_R_CNTRL_MII_MODE;
+	/*
+	 * Set MII_SPEED = (1/(mii_speed * 2)) * System Clock
+	 * and do not drop the Preamble.
+	 */
+	writel(((fec_clk_get_rate(fec) >> 20) / 5) << 1,
+			fec->regs + FEC_MII_SPEED);
+
+	if (fec->interface == PHY_INTERFACE_MODE_RMII) {
+		if (fec_is_imx28(fec) || fec_is_imx6(fec)) {
 			rcntl |= FEC_R_CNTRL_RMII_MODE | FEC_R_CNTRL_FCE |
 				FEC_R_CNTRL_NO_LGTH_CHECK;
 		} else {
@@ -326,7 +326,7 @@ static int fec_init(struct eth_device *dev)
 		}
 	}
 
-	if (fec->xcv_type == RGMII)
+	if (fec->interface == PHY_INTERFACE_MODE_RGMII)
 		rcntl |= 1 << 6;
 
 	writel(rcntl, fec->regs + FEC_R_CNTRL);
@@ -361,12 +361,18 @@ static int fec_init(struct eth_device *dev)
 static void fec_update_linkspeed(struct eth_device *edev)
 {
 	struct fec_priv *fec = (struct fec_priv *)edev->priv;
+	int speed = edev->phydev->speed;
+	u32 rcntl = readl(fec->regs + FEC_R_CNTRL) & ~FEC_R_CNTRL_RMII_10T;
+	u32 ecntl = readl(fec->regs + FEC_ECNTRL) & ~FEC_ECNTRL_SPEED;
 
-	if (edev->phydev->speed == SPEED_10) {
-		u32 rcntl = readl(fec->regs + FEC_R_CNTRL);
+	if (speed == SPEED_10)
 		rcntl |= FEC_R_CNTRL_RMII_10T;
-		writel(rcntl, fec->regs + FEC_R_CNTRL);
-	}
+
+	if (speed == SPEED_1000)
+		ecntl |= FEC_ECNTRL_SPEED;
+
+	writel(rcntl, fec->regs + FEC_R_CNTRL);
+	writel(ecntl, fec->regs + FEC_ECNTRL);
 }
 
 /**
@@ -379,16 +385,14 @@ static int fec_open(struct eth_device *edev)
 	int ret;
 	u32 ecr;
 
-	if (fec->xcv_type != SEVENWIRE) {
-		ret = phy_device_connect(edev, &fec->miibus, fec->phy_addr,
-					 fec_update_linkspeed, fec->phy_flags,
-					 fec->interface);
-		if (ret)
-			return ret;
+	ret = phy_device_connect(edev, &fec->miibus, fec->phy_addr,
+				 fec_update_linkspeed, fec->phy_flags,
+				 fec->interface);
+	if (ret)
+		return ret;
 
-		if (fec->phy_init)
-			fec->phy_init(edev->phydev);
-	}
+	if (fec->phy_init)
+		fec->phy_init(edev->phydev);
 
 	/*
 	 * Initialize RxBD/TxBD rings
@@ -425,15 +429,20 @@ static int fec_open(struct eth_device *edev)
 static void fec_halt(struct eth_device *dev)
 {
 	struct fec_priv *fec = (struct fec_priv *)dev->priv;
-	int counter = 0xffff;
+	uint64_t tmo;
 
 	/* issue graceful stop command to the FEC transmitter if necessary */
 	writel(readl(fec->regs + FEC_X_CNTRL) | FEC_ECNTRL_RESET,
 			fec->regs + FEC_X_CNTRL);
 
 	/* wait for graceful stop to register */
-	while ((counter--) && (!(readl(fec->regs + FEC_IEVENT) & FEC_IEVENT_GRA)))
-		;	/* FIXME ensure time */
+	tmo = get_time_ns();
+	while (!(readl(fec->regs + FEC_IEVENT) & FEC_IEVENT_GRA)) {
+		if (is_timeout(tmo, 1 * SECOND)) {
+			dev_err(&dev->dev, "graceful stop timeout\n");
+			break;
+		}
+	}
 
 	/* Disable SmartDMA tasks */
 	fec_tx_task_disable(fec);
@@ -468,12 +477,12 @@ static int fec_send(struct eth_device *dev, void *eth_data, int data_length)
 
 	/* Check for valid length of data. */
 	if ((data_length > 1500) || (data_length <= 0)) {
-		printf("Payload (%d) to large!\n", data_length);
+		dev_err(&dev->dev, "Payload (%d) to large!\n", data_length);
 		return -1;
 	}
 
 	if ((uint32_t)eth_data & (DB_DATA_ALIGNMENT-1))
-		printf("%s: Warning: Transmit data not aligned: %p!\n", __FUNCTION__, eth_data);
+		dev_warn(&dev->dev, "Transmit data not aligned: %p!\n", eth_data);
 
 	/*
 	 * Setup the transmit buffer
@@ -506,7 +515,7 @@ static int fec_send(struct eth_device *dev, void *eth_data, int data_length)
 	tmo = get_time_ns();
 	while (readw(&fec->tbd_base[fec->tbd_index].status) & FEC_TBD_READY) {
 		if (is_timeout(tmo, 1 * SECOND)) {
-			printf("transmission timeout\n");
+			dev_err(&dev->dev, "transmission timeout\n");
 			break;
 		}
 	}
@@ -544,7 +553,7 @@ static int fec_recv(struct eth_device *dev)
 		/* BABT, Rx/Tx FIFO errors */
 		fec_halt(dev);
 		fec_init(dev);
-		printf("some error: 0x%08x\n", ievent);
+		dev_err(&dev->dev, "some error: 0x%08x\n", ievent);
 		return 0;
 	}
 	if (!fec_is_imx28(fec)) {
@@ -587,7 +596,7 @@ static int fec_recv(struct eth_device *dev)
 			len = frame_length;
 		} else {
 			if (bd_status & FEC_RBD_ERR) {
-				printf("error frame: 0x%p 0x%08x\n", rbd, bd_status);
+				dev_warn(&dev->dev, "error frame: 0x%p 0x%08x\n", rbd, bd_status);
 			}
 		}
 		/*
@@ -620,6 +629,25 @@ static int fec_alloc_receive_packets(struct fec_priv *fec, int count, int size)
 	return 0;
 }
 
+#ifdef CONFIG_OFDEVICE
+static int fec_probe_dt(struct device_d *dev, struct fec_priv *fec)
+{
+	int ret;
+
+	ret = of_get_phy_mode(dev->device_node);
+	if (ret < 0)
+		fec->interface = PHY_INTERFACE_MODE_MII;
+	else
+		fec->interface = ret;
+
+	return 0;
+}
+#else
+static int fec_probe_dt(struct device_d *dev, struct fec_priv *fec)
+{
+	return -ENODEV;
+}
+#endif
 static int fec_probe(struct device_d *dev)
 {
         struct fec_platform_data *pdata = (struct fec_platform_data *)dev->platform_data;
@@ -677,41 +705,29 @@ static int fec_probe(struct device_d *dev)
 
 	fec_alloc_receive_packets(fec, FEC_RBD_NUM, FEC_MAX_PKT_SIZE);
 
-	if (pdata) {
-		fec->xcv_type = pdata->xcv_type;
+	if (dev->device_node) {
+		ret = fec_probe_dt(dev, fec);
+	} else if (pdata) {
+		fec->interface = pdata->xcv_type;
 		fec->phy_init = pdata->phy_init;
 		fec->phy_addr = pdata->phy_addr;
 	} else {
-		fec->xcv_type = MII100;
+		fec->interface = PHY_INTERFACE_MODE_MII;
 		fec->phy_addr = -1;
 	}
 
+	if (ret)
+		goto err_free;
+
 	fec_init(edev);
 
-	if (fec->xcv_type != SEVENWIRE) {
-		fec->miibus.read = fec_miibus_read;
-		fec->miibus.write = fec_miibus_write;
-		switch (fec->xcv_type) {
-		case RMII:
-			fec->interface = PHY_INTERFACE_MODE_RMII;
-			break;
-		case RGMII:
-			fec->interface = PHY_INTERFACE_MODE_RGMII;
-			break;
-		case MII10:
-			fec->phy_flags = PHYLIB_FORCE_10;
-		case MII100:
-			fec->interface = PHY_INTERFACE_MODE_MII;
-			break;
-		case SEVENWIRE:
-			fec->interface = PHY_INTERFACE_MODE_NA;
-			break;
-		}
-		fec->miibus.priv = fec;
-		fec->miibus.parent = dev;
+	fec->miibus.read = fec_miibus_read;
+	fec->miibus.write = fec_miibus_write;
 
-		mdiobus_register(&fec->miibus);
-	}
+	fec->miibus.priv = fec;
+	fec->miibus.parent = dev;
+
+	mdiobus_register(&fec->miibus);
 
 	eth_register(edev);
 	return 0;
@@ -768,14 +784,7 @@ static struct driver_d fec_driver = {
 	.of_compatible = DRV_OF_COMPAT(imx_fec_dt_ids),
 	.id_table = imx_fec_ids,
 };
-
-static int fec_register(void)
-{
-	platform_driver_register(&fec_driver);
-	return 0;
-}
-
-device_initcall(fec_register);
+device_platform_driver(fec_driver);
 
 /**
  * @file

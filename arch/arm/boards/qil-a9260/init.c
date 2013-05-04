@@ -22,7 +22,6 @@
 #include <linux/clk.h>
 #include <mach/board.h>
 #include <mach/at91sam9_smc.h>
-#include <mach/sam9_smc.h>
 #include <gpio.h>
 #include <led.h>
 #include <mach/io.h>
@@ -32,7 +31,7 @@
 static struct atmel_nand_data nand_pdata = {
 	.ale		= 21,
 	.cle		= 22,
-	.det_pin	= 0,
+	.det_pin	= -EINVAL,
 	.rdy_pin	= AT91_PIN_PC13,
 	.enable_pin	= AT91_PIN_PC14,
 	.on_flash_bbt	= 1,
@@ -59,7 +58,7 @@ static struct sam9_smc_config nand_smc_config = {
 static void qil_a9260_add_device_nand(void)
 {
 	/* configure chip-select 3 (NAND) */
-	sam9_smc_configure(3, &nand_smc_config);
+	sam9_smc_configure(0, 3, &nand_smc_config);
 
 	at91_add_device_nand(&nand_pdata);
 }
@@ -67,6 +66,8 @@ static void qil_a9260_add_device_nand(void)
 #if defined(CONFIG_MCI_ATMEL)
 static struct atmel_mci_platform_data __initdata qil_a9260_mci_data = {
 	.bus_width	= 4,
+	.detect_pin     = -EINVAL,
+	.wp_pin         = -EINVAL,
 };
 
 static void qil_a9260_add_device_mci(void)
@@ -78,8 +79,8 @@ static void qil_a9260_add_device_mci(void) {}
 #endif
 
 #ifdef CONFIG_CALAO_MB_QIL_A9260
-static struct at91_ether_platform_data macb_pdata = {
-	.is_rmii	= 1,
+static struct macb_platform_data macb_pdata = {
+	.phy_interface	= PHY_INTERFACE_MODE_RMII,
 	.phy_addr	= -1,
 };
 
@@ -120,7 +121,7 @@ static void qil_a9260_phy_reset(void)
  */
 static struct at91_udc_data __initdata ek_udc_data = {
 	.vbus_pin	= AT91_PIN_PC5,
-	.pullup_pin	= 0,		/* pull-up driven by UDC */
+	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
 };
 
 static void __init qil_a9260_add_device_mb(void)

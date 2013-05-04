@@ -29,7 +29,7 @@
 
 #include <mach/omap_hsmmc.h>
 
-#if defined(CONFIG_I2C_TWL6030) && \
+#if defined(CONFIG_MFD_TWL6030) && \
 	defined(CONFIG_MCI_OMAP_HSMMC) && \
 	defined(CONFIG_ARCH_OMAP4)
 #include <mach/omap4_twl6030_mmc.h>
@@ -57,6 +57,18 @@ struct hsmmc {
 	unsigned int ie;		/* 0x134 */
 	unsigned char res4[0x8];
 	unsigned int capa;		/* 0x140 */
+};
+
+struct omap_mmc_driver_data {
+	unsigned long reg_ofs;
+};
+
+static struct omap_mmc_driver_data omap3_data = {
+	.reg_ofs = 0,
+};
+
+static struct omap_mmc_driver_data omap4_data = {
+	.reg_ofs = 0x100,
 };
 
 /*
@@ -175,6 +187,7 @@ struct omap_hsmmc {
 	struct mci_host		mci;
 	struct device_d		*dev;
 	struct hsmmc		*base;
+	void __iomem		*iobase;
 };
 
 #define to_hsmmc(mci)	container_of(mci, struct omap_hsmmc, mci)
@@ -222,7 +235,7 @@ static int mmc_init_setup(struct mci_host *mci, struct device_d *dev)
  * It's necessary to do this here, because
  * you need to set up this at probetime.
  */
-#if defined(CONFIG_I2C_TWL6030) && \
+#if defined(CONFIG_MFD_TWL6030) && \
 	defined(CONFIG_MCI_OMAP_HSMMC) && \
 	defined(CONFIG_ARCH_OMAP4)
 	set_up_mmc_voltage_omap4();
@@ -565,6 +578,13 @@ static int omap_mmc_probe(struct device_d *dev)
 {
 	struct omap_hsmmc *hsmmc;
 	struct omap_hsmmc_platform_data *pdata;
+	struct omap_mmc_driver_data *drvdata;
+	unsigned long reg_ofs = 0;
+	int ret;
+
+	ret = dev_get_drvdata(dev, (unsigned long *)&drvdata);
+	if (!ret)
+		reg_ofs = drvdata->reg_ofs;
 
 	hsmmc = xzalloc(sizeof(*hsmmc));
 
@@ -575,7 +595,8 @@ static int omap_mmc_probe(struct device_d *dev)
 	hsmmc->mci.host_caps = MMC_MODE_4BIT | MMC_MODE_HS_52MHz | MMC_MODE_HS;
 	hsmmc->mci.hw_dev = dev;
 
-	hsmmc->base = dev_request_mem_region(dev, 0);
+	hsmmc->iobase = dev_request_mem_region(dev, 0);
+	hsmmc->base = hsmmc->iobase + reg_ofs;
 
 	hsmmc->mci.voltages = MMC_VDD_32_33 | MMC_VDD_33_34;
 
@@ -592,16 +613,21 @@ static int omap_mmc_probe(struct device_d *dev)
 	return 0;
 }
 
-static struct driver_d omap_mmc_driver = {
-        .name  = "omap-hsmmc",
-        .probe = omap_mmc_probe,
+static struct platform_device_id omap_mmc_ids[] = {
+	{
+		.name = "omap3-hsmmc",
+		.driver_data = (unsigned long)&omap3_data,
+	}, {
+		.name = "omap4-hsmmc",
+		.driver_data = (unsigned long)&omap4_data,
+	}, {
+		/* sentinel */
+	},
 };
 
-static int omap_mmc_init_driver(void)
-{
-        platform_driver_register(&omap_mmc_driver);
-        return 0;
-}
-
-device_initcall(omap_mmc_init_driver);
-
+static struct driver_d omap_mmc_driver = {
+	.name  = "omap-hsmmc",
+	.probe = omap_mmc_probe,
+	.id_table = omap_mmc_ids,
+};
+device_platform_driver(omap_mmc_driver);

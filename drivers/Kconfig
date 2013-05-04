@@ -1,10 +1,11 @@
 menu "Drivers"
 
+source "drivers/of/Kconfig"
+source "drivers/amba/Kconfig"
 source "drivers/serial/Kconfig"
 source "drivers/net/Kconfig"
 source "drivers/spi/Kconfig"
 source "drivers/i2c/Kconfig"
-source "drivers/nor/Kconfig"
 source "drivers/mtd/Kconfig"
 source "drivers/ata/Kconfig"
 source "drivers/usb/Kconfig"
@@ -21,7 +22,6 @@ source "drivers/watchdog/Kconfig"
 source "drivers/pwm/Kconfig"
 source "drivers/dma/Kconfig"
 source "drivers/gpio/Kconfig"
-source "drivers/of/Kconfig"
 source "drivers/w1/Kconfig"
 
 endmenu

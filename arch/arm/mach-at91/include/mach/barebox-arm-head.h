@@ -1,7 +1,7 @@
 #ifndef __MACH_ARM_HEAD_H
 #define __MACH_ARM_HEAD_H
 
-#ifdef CONFIG_SHELL_NONE
+#ifdef CONFIG_AT91_LOAD_BAREBOX_SRAM
 #define AT91_EXV6	".word _barebox_image_size\n"
 #else
 #define AT91_EXV6	".word _barebox_bare_init_size\n"
@@ -13,7 +13,7 @@ static inline void barebox_arm_head(void)
 #ifdef CONFIG_THUMB2_BAREBOX
 #error Thumb2 is not supported
 #else
-		"b reset\n"
+		"b barebox_arm_reset_vector\n"
 		"1: b 1b\n"
 		"1: b 1b\n"
 		"1: b 1b\n"

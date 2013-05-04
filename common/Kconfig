@@ -37,9 +37,6 @@ config BLOCK
 config BLOCK_WRITE
 	bool
 
-config HAVE_NOSHELL
-	bool
-
 config FILETYPE
 	bool
 
@@ -108,47 +105,7 @@ config ENVIRONMENT_VARIABLES
 
 menu "memory layout"
 
-config HAVE_PBL_IMAGE
-	bool
-
-config HAVE_IMAGE_COMPRESSION
-	bool
-
-config PBL_IMAGE
-	bool "Pre-Bootloader image"
-	depends on HAVE_PBL_IMAGE
-
-config PBL_FORCE_PIGGYDATA_COPY
-	bool
-	help
-	  In some case we need to copy the PIGGYDATA as the link address
-	  as example we run from SRAM and shutdown the SDRAM/DDR for
-	  reconfiguration but most of the time we just need to copy the
-	  executable code.
-
-if PBL_IMAGE
-
-config IMAGE_COMPRESSION
-	bool
-	depends on HAVE_IMAGE_COMPRESSION
-	default y
-
-if IMAGE_COMPRESSION
-
-choice
-	prompt "Compression"
-
-config IMAGE_COMPRESSION_LZO
-	bool "lzo"
-
-config IMAGE_COMPRESSION_GZIP
-	bool "gzip"
-
-endchoice
-
-endif
-
-endif
+source "pbl/Kconfig"
 
 config MMU
 	bool "Enable MMU"
@@ -156,6 +113,15 @@ config MMU
 	  Saying yes here enables the MMU. This is useful on some architectures
 	  to enable the data cache which depends on the MMU. See Documentation/mmu.txt
 	  for further information.
+
+config MMU_EARLY
+	bool "Enable MMU early"
+	depends on ARM
+	depends on MMU
+	default y
+	help
+	  This enables the MMU during early startup. This speeds up things during startup
+	  of barebox, but may lead to harder to debug code. If unsure say yes here.
 
 config HAVE_CONFIGURABLE_TEXT_BASE
 	bool
@@ -277,7 +243,7 @@ config KALLSYMS
 	  This is useful to print a nice backtrace when an exception occurs.
 
 config RELOCATABLE
-	depends on PPC
+	depends on PPC || ARM
 	bool "generate relocatable barebox binary"
 	help
 	  A non relocatable barebox binary will run at it's compiled in
@@ -286,18 +252,6 @@ config RELOCATABLE
 	  instead barebox can determine this address at runtime and thus
 	  allowing it to relocate to the end of the available RAM. This
 	  way you have the whole memory in a single piece.
-
-config MACH_HAS_LOWLEVEL_INIT
-	bool
-
-config MACH_DO_LOWLEVEL_INIT
-	bool "run machine low-level init"
-	depends on MACH_HAS_LOWLEVEL_INIT
-	default y
-	help
-	  This entry enables SDRAM and other board low level initialization
-	  on many platforms. Disabling this option allows configurations to use
-	  barebox as a second stage boot loader.
 
 config PROMPT
 	string
@@ -352,12 +306,11 @@ choice
 		  simple shell. No if/then, no return values from commands, no loops
 
 	config SHELL_NONE
-		depends on HAVE_NOSHELL
 		bool "no shell (noninteractive build)"
 		help
 		  No shell at all. This means no shell is started and your board has
-		  to provide a run_shell() function which is started at the end of
-		  the barebox startup process.
+		  to overwrite the barebox_main function pointer which is then called
+		  at the end of the barebox startup process.
 endchoice
 
 config GLOB
@@ -407,7 +360,6 @@ config AUTO_COMPLETE
 config MENU
 	bool
 	prompt "Menu Framework"
-	depends on PROCESS_ESCAPE_SEQUENCE
 	help
 	  a menu framework that allow us to create list menu to simplify
 	  barebox and make it more user-frendly
@@ -465,10 +417,13 @@ config TIMESTAMP
 	  commands like bootm or iminfo. This option is
 	  automatically enabled when you select CFG_CMD_DATE .
 
+choice
+	prompt "console support"
+	default CONSOLE_FULL
+
 config CONSOLE_FULL
 	bool
-	default y
-	prompt "Enable full console support"
+	prompt "full"
 	help
 	  This option enables full console support capable of
 	  handling multiple consoles. Also the full console support
@@ -476,6 +431,16 @@ config CONSOLE_FULL
 	  is registered in a circular buffer which will be printed
 	  once the first console is registered. Recommended for most
 	  usecases.
+
+config CONSOLE_SIMPLE
+	bool
+	prompt "simple"
+
+config CONSOLE_NONE
+	bool
+	prompt "none"
+
+endchoice
 
 choice
 	prompt "Console activation strategy"
@@ -509,28 +474,11 @@ config CONSOLE_ACTIVATE_NONE
 
 endchoice
 
-config CONSOLE_SIMPLE
-	bool
-	default y
-	depends on !CONSOLE_FULL
-
 config PARTITION
 	bool
 	prompt "Enable Partitions"
 
-config PARTITION_DISK
-	depends on PARTITION
-	bool "DISK partition support"
-	help
-	  Add support for handling common partition tables on all kind of disk
-	  like devices (harddisks, CF cards, SD cards and so on)
-
-config PARTITION_DISK_DOS
-	depends on PARTITION_DISK
-	default y
-	bool "DOS partition support"
-	help
-	  Add support to handle partitions in DOS style.
+source common/partitions/Kconfig
 
 config DEFAULT_ENVIRONMENT
 	bool
@@ -584,6 +532,8 @@ config DEFAULT_ENVIRONMENT_GENERIC_NEW
 	select CMD_GLOBAL
 	select CMD_AUTOMOUNT
 	select CMD_BASENAME
+	select CMD_READLINK
+	select CMD_DIRNAME
 	select FLEXIBLE_BOOTARGS
 	prompt "Generic environment template"
 
@@ -636,6 +586,22 @@ config RESET_SOURCE
 endmenu
 
 menu "Debugging"
+
+config COMPILE_LOGLEVEL
+	int "loglevel"
+	default 6
+	help
+	  This defines the maximum loglevel compiled into the binary. Less important
+	  messages will be compiled away resulting in a smaller binary.
+
+	  0    system is unusable (emerg)
+	  1    action must be taken immediately (alert)
+	  2    critical conditions (crit)
+	  3    error conditions (err)
+	  4    warning conditions (warn)
+	  5    normal but significant condition (notice)
+	  6    informational (info)
+	  7    debug-level messages (debug)
 
 config DEBUG_INFO
 	bool

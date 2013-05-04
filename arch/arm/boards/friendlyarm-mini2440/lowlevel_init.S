@@ -3,16 +3,17 @@
  */
 
 #include <config.h>
+#include <sizes.h>
 #include <mach/s3c-iomap.h>
 #include <asm/barebox-arm-head.h>
 
-	.section ".text_bare_init.reset","ax"
+	.section ".text_bare_init.barebox_arm_reset_vector","ax"
 
 /* ------------------------------------------------------------------------ */
 
-.globl reset
-reset:
-	common_reset r0
+.globl barebox_arm_reset_vector
+barebox_arm_reset_vector:
+	arm_cpu_lowlevel_init r0
 
 	bl s3c24x0_disable_wd
 
@@ -22,7 +23,7 @@ reset:
 	cmp pc, #S3C_SDRAM_END
 	bhs 1f
 
-	b board_init_lowlevel_return
+	b out
 
 /* we are running from NOR or NAND/SRAM memory. Do further initialisation */
 1:
@@ -34,4 +35,8 @@ reset:
 /* up to here we are running from the internal SRAM area */
 	bl s3c24x0_nand_boot
 #endif
-	b board_init_lowlevel_return
+out:
+	mov r0, #S3C_SDRAM_BASE
+	mov r1, #SZ_32M
+	mov r2, #0
+	b barebox_arm_entry

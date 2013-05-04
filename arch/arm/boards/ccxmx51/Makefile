@@ -1,3 +1,4 @@
-obj-y					+= flash_header.o ccxmx51.o
-pbl-y					+= flash_header.o
+obj-y					+= ccxmx51.o
+lwl-y				+= flash_header.o
+lwl-y				+= lowlevel.o
 obj-$(CONFIG_MACH_CCMX51_BASEBOARD)	+= ccxmx51js.o

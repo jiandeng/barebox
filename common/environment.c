@@ -41,9 +41,16 @@
 #define EXPORT_SYMBOL(x)
 #endif
 
+struct action_data {
+	int fd;
+	const char *base;
+	void *writep;
+};
+#define PAD4(x) ((x + 3) & ~3)
+
 char *default_environment_path = "/dev/env0";
 
-int file_size_action(const char *filename, struct stat *statbuf,
+static int file_size_action(const char *filename, struct stat *statbuf,
 			    void *userdata, int depth)
 {
 	struct action_data *data = userdata;
@@ -68,7 +75,7 @@ int file_size_action(const char *filename, struct stat *statbuf,
 	return 1;
 }
 
-int file_save_action(const char *filename, struct stat *statbuf,
+static int file_save_action(const char *filename, struct stat *statbuf,
 			    void *userdata, int depth)
 {
 	struct action_data *data = userdata;
@@ -106,11 +113,13 @@ int file_save_action(const char *filename, struct stat *statbuf,
 		memcpy(data->writep, path, len);
 		inode->size = ENVFS_32(len);
 		data->writep += PAD4(len);
-		debug("handling symlink %s size %ld namelen %d headerlen %d\n", filename + strlen(data->base),
-			len, namelen, ENVFS_32(inode->headerlen));
+		debug("handling symlink %s size %d namelen %d headerlen %d\n",
+				filename + strlen(data->base),
+				len, namelen, ENVFS_32(inode->headerlen));
 	} else {
-		debug("handling file %s size %ld namelen %d headerlen %d\n", filename + strlen(data->base),
-			statbuf->st_size, namelen, ENVFS_32(inode->headerlen));
+		debug("handling file %s size %lld namelen %d headerlen %d\n",
+				filename + strlen(data->base),
+				statbuf->st_size, namelen, ENVFS_32(inode->headerlen));
 
 		inode->size = ENVFS_32(statbuf->st_size);
 		fd = open(filename, O_RDONLY);
@@ -354,3 +363,43 @@ out:
 		free(buf_free);
 	return ret;
 }
+
+#ifdef __BAREBOX__
+/**
+ * Try to register an environment storage on a device's partition
+ * @return 0 on success
+ *
+ * We rely on the existence of a usable storage device, already attached to
+ * our system, to get something like a persistent memory for our environment.
+ * We need to specify the partition number to use on this device.
+ * @param[in] devname Name of the device
+ * @param[in] partnr Partition number
+ * @return 0 on success, anything else in case of failure
+ */
+
+int envfs_register_partition(const char *devname, unsigned int partnr)
+{
+	struct cdev *cdev;
+	char *partname;
+
+	if (!devname)
+		return -EINVAL;
+
+	cdev = cdev_by_name(devname);
+	if (cdev == NULL) {
+		pr_err("No %s present\n", devname);
+		return -ENODEV;
+	}
+	partname = asprintf("%s.%d", devname, partnr);
+	cdev = cdev_by_name(partname);
+	if (cdev == NULL) {
+		pr_err("No %s partition available\n", partname);
+		pr_info("Please create the partition %s to store the env\n", partname);
+		return -ENODEV;
+	}
+
+	return devfs_add_partition(partname, 0, cdev->size,
+						DEVFS_PARTITION_FIXED, "env0");
+}
+EXPORT_SYMBOL(envfs_register_partition);
+#endif

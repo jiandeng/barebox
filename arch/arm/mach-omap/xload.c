@@ -1,11 +1,12 @@
 #include <common.h>
 #include <partition.h>
 #include <nand.h>
+#include <init.h>
 #include <driver.h>
 #include <linux/mtd/mtd.h>
 #include <fs.h>
 #include <fcntl.h>
-#include <mach/xload.h>
+#include <mach/generic.h>
 #include <sizes.h>
 #include <filetype.h>
 
@@ -157,19 +158,10 @@ static void *omap4_xload_boot_usb(void){
 	return buf;
 }
 
-enum omap_boot_src omap_bootsrc(void)
-{
-#if defined(CONFIG_ARCH_OMAP3)
-	return omap3_bootsrc();
-#elif defined(CONFIG_ARCH_OMAP4)
-	return omap4_bootsrc();
-#endif
-}
-
 /*
  * Replaces the default shell in xload configuration
  */
-int run_shell(void)
+static __noreturn int omap_xload(void)
 {
 	int (*func)(void) = NULL;
 
@@ -209,3 +201,11 @@ int run_shell(void)
 
 	while (1);
 }
+
+static int omap_set_xload(void)
+{
+	barebox_main = omap_xload;
+
+	return 0;
+}
+late_initcall(omap_set_xload);

@@ -76,10 +76,10 @@
 	ldr		r1,	=val;	\
 	str		r1,   [r0];
 
-.globl reset
-reset:
+.globl barebox_arm_reset_vector
+barebox_arm_reset_vector:
 
-	common_reset r0
+	arm_cpu_lowlevel_init r0
 
 	/* Change PERCLK1DIV to 14 ie 14+1 */
 	writel(CFG_PCDR_VAL, MX1_CCM_BASE_ADDR + MX1_PCDR)
@@ -151,7 +151,7 @@ reset:
 	cmp	pc, #0x09000000
 	bhi	1f
 
-	b board_init_lowlevel_return
+	b imx1_barebox_entry
 
 1:
 
@@ -181,4 +181,4 @@ reset:
 	/* Set to Normal Mode CAS 2 */
 	writel(0x810a8200, MX1_SDRAMC_BASE_ADDR + MX1_SDCTL0)
 
-	b board_init_lowlevel_return
+	b imx1_barebox_entry

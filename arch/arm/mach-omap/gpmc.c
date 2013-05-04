@@ -24,10 +24,30 @@
 #include <init.h>
 #include <io.h>
 #include <errno.h>
-#include <mach/silicon.h>
+#include <mach/omap3-silicon.h>
+#include <mach/omap4-silicon.h>
+#include <mach/am33xx-silicon.h>
 #include <mach/gpmc.h>
 #include <mach/sys_info.h>
 #include <mach/syslib.h>
+
+void __iomem *omap_gpmc_base;
+
+static int gpmc_init(void)
+{
+#if defined(CONFIG_ARCH_OMAP3)
+	omap_gpmc_base = (void *)OMAP3_GPMC_BASE;
+#elif defined(CONFIG_ARCH_OMAP4)
+	omap_gpmc_base = (void *)OMAP44XX_GPMC_BASE;
+#elif defined(CONFIG_ARCH_AM33XX)
+	omap_gpmc_base = (void *)AM33XX_GPMC_BASE;
+#else
+#error "Unknown ARCH"
+#endif
+
+	return 0;
+}
+pure_initcall(gpmc_init);
 
 /**
  * @brief Do a Generic initialization of GPMC. if you choose otherwise,
@@ -43,7 +63,7 @@
 void gpmc_generic_init(unsigned int cfg)
 {
 	uint64_t start;
-	unsigned int reg = GPMC_REG(CONFIG7_0);
+	void __iomem *reg = GPMC_REG(CONFIG7_0);
 	char x = 0;
 
 	debug("gpmccfg=0x%x\n", cfg);
@@ -69,7 +89,7 @@ void gpmc_generic_init(unsigned int cfg)
 	 * But NEVER run me in XIP mode! I will Die!
 	 */
 	while (x < GPMC_NUM_CS) {
-		debug("gpmccs=%d Reg:0x%x <-0x0\n", x, reg);
+		debug("gpmccs=%d Reg:0x%p <-0x0\n", x, reg);
 		writel(0x0, reg);
 		reg += GPMC_CONFIG_CS_SIZE;
 		x++;
@@ -89,7 +109,7 @@ EXPORT_SYMBOL(gpmc_generic_init);
  */
 void gpmc_cs_config(char cs, struct gpmc_config *config)
 {
-	unsigned int reg = GPMC_REG(CONFIG1_0) + (cs * GPMC_CONFIG_CS_SIZE);
+	void __iomem *reg = GPMC_REG(CONFIG1_0) + (cs * GPMC_CONFIG_CS_SIZE);
 	unsigned char x = 0;
 	debug("gpmccs=0x%x cfg=0x%p\n", cs, config);
 
@@ -99,14 +119,14 @@ void gpmc_cs_config(char cs, struct gpmc_config *config)
 
 	/* Write the CFG1-6 regs */
 	while (x < 6) {
-		debug("gpmccfg%d Reg:0x%x <-0x%08x\n",
+		debug("gpmccfg%d Reg:0x%p <-0x%08x\n",
 				x, reg, config->cfg[x]);
 		writel(config->cfg[x], reg);
 		reg += GPMC_CONFIG_REG_OFF;
 		x++;
 	}
 	/* reg now points to CFG7 */
-	debug("gpmccfg%d Reg:0x%x <-0x%08x\n",
+	debug("gpmccfg%d Reg:0x%p <-0x%08x\n",
 			x, reg, (0x1 << 6) |		/* CS enable */
 		     ((config->size & 0xF) << 8) |	/* Size */
 		     ((config->base >> 24) & 0x3F));

@@ -70,6 +70,7 @@
 #define MX21_NFC_BASE_ADDR		(MX21_X_MEMC_BASE_ADDR + 0x3000)
 
 #define MX21_IRAM_BASE_ADDR		0xffffe800	/* internal ram */
+#define MX21_IRAM_SIZE			0x00001800
 
 /* AIPI (base MX21_AIPI_BASE_ADDR) */
 #define MX21_AIPI1_PSR0	0x00
@@ -128,12 +129,6 @@
 
 #define MX21_MPCTL1_BRMO	(1 << 6)
 #define MX21_MPCTL1_LF		(1 << 15)
-
-#define MX21_PCCR0_PERCLK3_EN	(1 << 18)
-#define MX21_PCCR0_NFC_EN	(1 << 19)
-#define MX21_PCCR0_HCLK_LCDC_EN	(1 << 26)
-
-#define MX21_PCCR1_GPT1_EN	(1 << 25)
 
 #define MX21_CCSR_32K_SR	(1 << 15)
 

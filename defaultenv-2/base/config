@@ -6,16 +6,20 @@
 #global.hostname=
 
 # set to false if you do not want to have colors
-global.allow_color=true
+#global.allow_color=true
 
 # user (used for network filenames)
-global.user=none
+#global.user=none
 
 # timeout in seconds before the default boot entry is started
-global.autoboot_timeout=3
+#global.autoboot_timeout=3
 
-# default boot entry (one of /env/boot/*)
-global.boot.default=net
+# list of boot entries. These are executed in order until one
+# succeeds. An entry can be:
+# - a filename in /env/boot/
+# - a full path to a directory. All files in this directory are
+#   treated as boot files and executed in alphabetical order
+#global.boot.default=net
 
 # base bootargs
 #global.linux.bootargs.base="console=ttyS0,115200"

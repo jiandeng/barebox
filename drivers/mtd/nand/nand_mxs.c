@@ -1252,7 +1252,7 @@ static int mxs_nand_probe(struct device_d *dev)
 	if (err)
 		goto err2;
 
-	return add_mtd_device(mtd, "nand");
+	return add_mtd_nand_device(mtd, "nand");
 err2:
 	free(nand_info->data_buf);
 	free(nand_info->cmd_buf);
@@ -1265,13 +1265,7 @@ static struct driver_d mxs_nand_driver = {
 	.name  = "mxs_nand",
 	.probe = mxs_nand_probe,
 };
-
-static int __init mxs_nand_init(void)
-{
-	return platform_driver_register(&mxs_nand_driver);
-}
-
-device_initcall(mxs_nand_init);
+device_platform_driver(mxs_nand_driver);
 
 MODULE_AUTHOR("Denx Software Engeneering and Wolfram Sang");
 MODULE_DESCRIPTION("MXS NAND MTD driver");

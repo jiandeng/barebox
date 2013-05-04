@@ -60,7 +60,7 @@ static int imx53_init(void)
 
 	add_generic_device("imx-iomuxv3", 0, NULL, MX53_IOMUXC_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
 	add_generic_device("imx53-ccm", 0, NULL, MX53_CCM_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
-	add_generic_device("imx31-gpt", 0, NULL, 0X53fa0000, 0x1000, IORESOURCE_MEM, NULL);
+	add_generic_device("imx31-gpt", 0, NULL, MX53_GPT1_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
 	add_generic_device("imx31-gpio", 0, NULL, MX53_GPIO1_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
 	add_generic_device("imx31-gpio", 1, NULL, MX53_GPIO2_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
 	add_generic_device("imx31-gpio", 2, NULL, MX53_GPIO3_BASE_ADDR, 0x1000, IORESOURCE_MEM, NULL);
@@ -75,7 +75,7 @@ static int imx53_init(void)
 }
 postcore_initcall(imx53_init);
 
-void imx53_init_lowlevel(unsigned int cpufreq_mhz)
+void imx53_init_lowlevel_early(unsigned int cpufreq_mhz)
 {
 	void __iomem *ccm = (void __iomem *)MX53_CCM_BASE_ADDR;
 	u32 r;
@@ -146,7 +146,7 @@ void imx53_init_lowlevel(unsigned int cpufreq_mhz)
 	/* make sure change is effective */
 	while (readl(ccm + MX5_CCM_CDHIPR));
 
-	imx53_setup_pll_216((void __iomem *)MX53_PLL3_BASE_ADDR);
+	imx5_setup_pll_216((void __iomem *)MX53_PLL3_BASE_ADDR);
 	imx5_setup_pll_455((void __iomem *)MX53_PLL4_BASE_ADDR);
 
 	/* Set the platform clock dividers */
@@ -188,8 +188,12 @@ void imx53_init_lowlevel(unsigned int cpufreq_mhz)
 	writel(0xffffffff, ccm + MX5_CCM_CCGR6);
 	writel(0xffffffff, ccm + MX53_CCM_CCGR7);
 
-	if (!IS_ENABLED(__PBL__))
-		clock_notifier_call_chain();
-
 	writel(0, ccm + MX5_CCM_CCDR);
+}
+
+void imx53_init_lowlevel(unsigned int cpufreq_mhz)
+{
+	imx53_init_lowlevel_early(cpufreq_mhz);
+
+	clock_notifier_call_chain();
 }

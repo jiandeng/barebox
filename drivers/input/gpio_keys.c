@@ -79,13 +79,15 @@ static int __init gpio_keys_probe(struct device_d *dev)
 	pdata->recv_fifo = kfifo_alloc(pdata->fifo_size);
 
 	for (i = 0; i < pdata->nbuttons; i++) {
-		gpio = pdata->buttons->gpio;
+		gpio = pdata->buttons[i].gpio;
 		ret = gpio_request(gpio, "gpio_keys");
 		if (ret) {
 			pr_err("gpio_keys: (%d) can not be requested\n", gpio);
 			return ret;
 		}
 		gpio_direction_input(gpio);
+		pdata->buttons[i].previous_state =
+			pdata->buttons[i].active_low;
 	}
 
 	pdata->poller.func = gpio_key_poller;
@@ -106,10 +108,4 @@ static struct driver_d gpio_keys_driver = {
 	.name	= "gpio_keys",
 	.probe	= gpio_keys_probe,
 };
-
-static int gpio_keys_init(void)
-{
-	platform_driver_register(&gpio_keys_driver);
-	return 0;
-}
-device_initcall(gpio_keys_init);
+device_platform_driver(gpio_keys_driver);

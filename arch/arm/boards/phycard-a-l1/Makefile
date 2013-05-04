@@ -15,3 +15,4 @@
 #
 
 obj-y += pca-a-l1.o
+lwl-y += lowlevel.o

@@ -5,7 +5,7 @@
 
 #ifndef __ASSEMBLY__
 
-static inline void common_reset(void)
+static inline void arm_cpu_lowlevel_init(void)
 {
 	uint32_t r;
 
@@ -33,6 +33,13 @@ static inline void common_reset(void)
 	set_cr(r);
 }
 
+/*
+ * 32 bytes at this offset is reserved in the barebox head for board/SoC
+ * usage
+ */
+#define ARM_HEAD_SPARE_OFS	0x30
+#define ARM_HEAD_SPARE_MARKER	0x55555555
+
 #ifdef CONFIG_HAVE_MACH_ARM_HEAD
 #include <mach/barebox-arm-head.h>
 #else
@@ -45,12 +52,12 @@ static inline void barebox_arm_head(void)
 		"bx r9\n"
 		".thumb\n"
 		"1:\n"
-		"bl reset\n"
+		"bl barebox_arm_reset_vector\n"
 		".rept 10\n"
 		"1: b 1b\n"
 		".endr\n"
 #else
-		"b reset\n"
+		"b barebox_arm_reset_vector\n"
 		"1: b 1b\n"
 		"1: b 1b\n"
 		"1: b 1b\n"
@@ -64,13 +71,16 @@ static inline void barebox_arm_head(void)
 							 * barebox can skip relocation
 							 */
 		".word _barebox_image_size\n"		/* image size to copy */
+		".rept 8\n"
+		".word 0x55555555\n"
+		".endr\n"
 	);
 }
 #endif
 
 #else
 
-.macro  common_reset, scratch
+.macro  arm_cpu_lowlevel_init, scratch
 
 	/* set the cpu to SVC32 mode */
 	mrs	\scratch, cpsr

@@ -244,6 +244,8 @@ static int qt1070_probe(struct device_d *dev)
 	sprintf(buf, "0x%x", chip_id);
 	dev_add_param_fixed(dev, "chip_ip", buf);
 
+	memcpy(data->code, default_code, sizeof(int) * ARRAY_SIZE(default_code));
+
 	ret = qt1070_pdata_init(dev, data);
 	if (ret) {
 		dev_err(dev, "can not get pdata (%d)\n", ret);
@@ -258,7 +260,6 @@ static int qt1070_probe(struct device_d *dev)
 	}
 	data->start = get_time_ns();
 
-	memcpy(data->code, default_code, sizeof(int) * ARRAY_SIZE(default_code));
 
 	data->fifo_size = 50;
 	data->recv_fifo = kfifo_alloc(data->fifo_size);
@@ -290,7 +291,7 @@ static struct driver_d qt1070_driver = {
 
 static int qt1070_init(void)
 {
-	i2c_register_driver(&qt1070_driver);
+	i2c_driver_register(&qt1070_driver);
 	return 0;
 }
 device_initcall(qt1070_init);

@@ -1,3 +1,24 @@
+/*
+ * start-pbl.c
+ *
+ * Copyright (c) 2009-2013 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
+ *
+ * See file CREDITS for list of people who contributed to this
+ * project.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+#define pr_fmt(fmt)	"mmu: " fmt
+
 #include <common.h>
 #include <init.h>
 #include <asm/mmu.h>
@@ -52,10 +73,24 @@ extern int arm_architecture;
 #define PTE_FLAGS_CACHED_V4 (PTE_SMALL_AP_UNO_SRW | PTE_BUFFERABLE | PTE_CACHEABLE)
 #define PTE_FLAGS_UNCACHED_V4 PTE_SMALL_AP_UNO_SRW
 
-static uint32_t PTE_FLAGS_CACHED;
-static uint32_t PTE_FLAGS_UNCACHED;
+/*
+ * PTE flags to set cached and uncached areas.
+ * This will be determined at runtime.
+ */
+static uint32_t pte_flags_cached;
+static uint32_t pte_flags_uncached;
 
 #define PTE_MASK ((1 << 12) - 1)
+
+uint32_t mmu_get_pte_cached_flags()
+{
+	return pte_flags_cached;
+}
+
+uint32_t mmu_get_pte_uncached_flags()
+{
+	return pte_flags_uncached;
+}
 
 /*
  * Create a second level translation table for the given virtual address.
@@ -72,7 +107,7 @@ static u32 *arm_create_pte(unsigned long virt)
 	ttb[virt >> 20] = (unsigned long)table | PMD_TYPE_TABLE;
 
 	for (i = 0; i < 256; i++) {
-		table[i] = virt | PTE_TYPE_SMALL | PTE_FLAGS_UNCACHED;
+		table[i] = virt | PTE_TYPE_SMALL | pte_flags_uncached;
 		virt += PAGE_SIZE;
 	}
 
@@ -93,7 +128,7 @@ static u32 *find_pte(unsigned long adr)
 	return &table[(adr >> PAGE_SHIFT) & 0xff];
 }
 
-static void remap_range(void *_start, size_t size, uint32_t flags)
+void remap_range(void *_start, size_t size, uint32_t flags)
 {
 	unsigned long start = (unsigned long)_start;
 	u32 *p;
@@ -138,7 +173,7 @@ static int arm_mmu_remap_sdram(struct memory_bank *bank)
 	int i, pte;
 	u32 *ptes;
 
-	debug("remapping SDRAM from 0x%08lx (size 0x%08lx)\n",
+	pr_debug("remapping SDRAM from 0x%08lx (size 0x%08lx)\n",
 			phys, bank->size);
 
 	/*
@@ -150,12 +185,12 @@ static int arm_mmu_remap_sdram(struct memory_bank *bank)
 
 	ptes = xmemalign(PAGE_SIZE, num_ptes * sizeof(u32));
 
-	debug("ptes: 0x%p ttb_start: 0x%08lx ttb_end: 0x%08lx\n",
+	pr_debug("ptes: 0x%p ttb_start: 0x%08lx ttb_end: 0x%08lx\n",
 			ptes, ttb_start, ttb_end);
 
 	for (i = 0; i < num_ptes; i++) {
 		ptes[i] = (phys + i * 4096) | PTE_TYPE_SMALL |
-			PTE_FLAGS_CACHED;
+			pte_flags_cached;
 	}
 
 	pte = 0;
@@ -212,14 +247,17 @@ static void vectors_init(void)
 		exc = arm_create_pte(0x0);
 	}
 
+	arm_fixup_vectors();
+
 	vectors = xmemalign(PAGE_SIZE, PAGE_SIZE);
 	memset(vectors, 0, PAGE_SIZE);
 	memcpy(vectors, __exceptions_start, __exceptions_stop - __exceptions_start);
 
 	if (cr & CR_V)
-		exc[256 - 16] = (u32)vectors | PTE_TYPE_SMALL | PTE_FLAGS_CACHED;
+		exc[256 - 16] = (u32)vectors | PTE_TYPE_SMALL |
+			pte_flags_cached;
 	else
-		exc[0] = (u32)vectors | PTE_TYPE_SMALL | PTE_FLAGS_CACHED;
+		exc[0] = (u32)vectors | PTE_TYPE_SMALL | pte_flags_cached;
 }
 
 /*
@@ -233,16 +271,26 @@ static int mmu_init(void)
 	arm_set_cache_functions();
 
 	if (cpu_architecture() >= CPU_ARCH_ARMv7) {
-		PTE_FLAGS_CACHED = PTE_FLAGS_CACHED_V7;
-		PTE_FLAGS_UNCACHED = PTE_FLAGS_UNCACHED_V7;
+		pte_flags_cached = PTE_FLAGS_CACHED_V7;
+		pte_flags_uncached = PTE_FLAGS_UNCACHED_V7;
 	} else {
-		PTE_FLAGS_CACHED = PTE_FLAGS_CACHED_V4;
-		PTE_FLAGS_UNCACHED = PTE_FLAGS_UNCACHED_V4;
+		pte_flags_cached = PTE_FLAGS_CACHED_V4;
+		pte_flags_uncached = PTE_FLAGS_UNCACHED_V4;
 	}
 
-	ttb = memalign(0x10000, 0x4000);
+	if (get_cr() & CR_M) {
+		asm volatile ("mrc  p15,0,%0,c2,c0,0" : "=r"(ttb));
 
-	debug("ttb: 0x%p\n", ttb);
+		/* Clear unpredictable bits [13:0] */
+		ttb = (unsigned long *)((unsigned long)ttb & ~0x3fff);
+
+		if (!request_sdram_region("ttb", (unsigned long)ttb, SZ_16K))
+			pr_err("Error: Can't request SDRAM region for ttb\n");
+	} else {
+		ttb = memalign(0x10000, 0x4000);
+	}
+
+	pr_debug("ttb: 0x%p\n", ttb);
 
 	/* Set the ttb register */
 	asm volatile ("mcr  p15,0,%0,c2,c0,0" : : "r"(ttb) /*:*/);
@@ -279,23 +327,6 @@ static int mmu_init(void)
 }
 mmu_initcall(mmu_init);
 
-struct outer_cache_fns outer_cache;
-
-/*
- * Clean and invalide caches, disable MMU
- */
-void mmu_disable(void)
-{
-
-	if (outer_cache.disable)
-		outer_cache.disable();
-
-	__mmu_cache_flush();
-	__mmu_cache_off();
-}
-
-#define PAGE_ALIGN(s) ((s) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-
 void *dma_alloc_coherent(size_t size)
 {
 	void *ret;
@@ -305,7 +336,7 @@ void *dma_alloc_coherent(size_t size)
 
 	dma_inv_range((unsigned long)ret, (unsigned long)ret + size);
 
-	remap_range(ret, size, PTE_FLAGS_UNCACHED);
+	remap_range(ret, size, pte_flags_uncached);
 
 	return ret;
 }
@@ -322,7 +353,7 @@ void *phys_to_virt(unsigned long phys)
 
 void dma_free_coherent(void *mem, size_t size)
 {
-	remap_range(mem, size, PTE_FLAGS_CACHED);
+	remap_range(mem, size, pte_flags_cached);
 
 	free(mem);
 }

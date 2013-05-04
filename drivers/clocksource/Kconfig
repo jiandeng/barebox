@@ -1,3 +1,7 @@
+config AMBA_SP804
+	bool
+	depends on ARM_AMBA
+
 config ARM_SMP_TWD
 	bool
 	depends on ARM && CPU_V7
@@ -5,6 +9,10 @@ config ARM_SMP_TWD
 config CLOCKSOURCE_BCM2835
 	bool
 	depends on ARCH_BCM2835
+
+config CLOCKSOURCE_CLPS711X
+	bool
+	depends on ARCH_CLPS711X
 
 config CLOCKSOURCE_NOMADIK
 	bool

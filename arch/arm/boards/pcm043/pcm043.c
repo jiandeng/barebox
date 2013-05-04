@@ -37,15 +37,18 @@
 #include <fec.h>
 #include <fb.h>
 #include <led.h>
+#include <bootsource.h>
 #include <asm/mmu.h>
 #include <mach/weim.h>
 #include <mach/imx-ipu-fb.h>
 #include <mach/imx-pll.h>
 #include <mach/iomux-mx35.h>
 #include <mach/devices-imx35.h>
+#include <mach/generic.h>
+#include <mach/bbu.h>
 
 static struct fec_platform_data fec_info = {
-	.xcv_type = MII100,
+	.xcv_type = PHY_INTERFACE_MODE_MII,
 };
 
 struct imx_nand_platform_data nand_info = {
@@ -113,6 +116,8 @@ struct gpio_led led0 = {
 static int imx35_devices_init(void)
 {
 	uint32_t reg;
+	char *envstr;
+	unsigned long bbu_nand_flags = 0;
 
 	/* CS0: Nor Flash */
 	imx35_setup_weimcs(5, 0x22C0CF00, 0x75000D01, 0x00000900);
@@ -137,28 +142,33 @@ static int imx35_devices_init(void)
 	 */
 	add_cfi_flash_device(DEVICE_ID_DYNAMIC, MX35_CS0_BASE_ADDR, 32 * 1024 * 1024, 0);
 
-	if ((reg & 0xc00) == 0x800) {   /* reset mode: external boot */
-		switch ( (reg >> 25) & 0x3) {
-		case 0x01:              /* NAND is the source */
-			devfs_add_partition("nand0", 0x00000, 0x40000, DEVFS_PARTITION_FIXED, "self_raw");
-			dev_add_bb_dev("self_raw", "self0");
-			devfs_add_partition("nand0", 0x40000, 0x20000, DEVFS_PARTITION_FIXED, "env_raw");
-			dev_add_bb_dev("env_raw", "env0");
-			break;
-
-		case 0x00:              /* NOR is the source */
-			devfs_add_partition("nor0", 0x00000, 0x40000, DEVFS_PARTITION_FIXED, "self0"); /* ourself */
-			devfs_add_partition("nor0", 0x40000, 0x20000, DEVFS_PARTITION_FIXED, "env0");  /* environment */
-			protect_file("/dev/env0", 1);
-			break;
-		}
+	switch (bootsource_get()) {
+	case BOOTSOURCE_NAND:
+		devfs_add_partition("nand0", 0x00000, SZ_512K, DEVFS_PARTITION_FIXED, "self_raw");
+		dev_add_bb_dev("self_raw", "self0");
+		devfs_add_partition("nand0", SZ_512K, SZ_256K, DEVFS_PARTITION_FIXED, "env_raw");
+		dev_add_bb_dev("env_raw", "env0");
+		envstr = "NAND";
+		bbu_nand_flags = BBU_HANDLER_FLAG_DEFAULT;
+		break;
+	case BOOTSOURCE_NOR:
+	default:
+		devfs_add_partition("nor0", 0x00000, SZ_512K, DEVFS_PARTITION_FIXED, "self0"); /* ourself */
+		devfs_add_partition("nor0", SZ_512K, SZ_128K, DEVFS_PARTITION_FIXED, "env0");  /* environment */
+		protect_file("/dev/env0", 1);
+		envstr = "NOR";
+		break;
 	}
 
+	pr_info("using environment from %s flash\n", envstr);
 
 	imx35_add_fb(&ipu_fb_data);
 
 	armlinux_set_bootparams((void *)0x80000100);
 	armlinux_set_architecture(MACH_TYPE_PCM043);
+
+	imx_bbu_external_nand_register_handler("nand", "/dev/nand0.barebox",
+			bbu_nand_flags);
 
 	return 0;
 }

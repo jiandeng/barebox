@@ -68,7 +68,6 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/nand_ecc.h>
 #include <io.h>
-#include <mach/silicon.h>
 #include <mach/gpmc.h>
 #include <mach/gpmc_nand.h>
 
@@ -1061,7 +1060,7 @@ static int gpmc_nand_probe(struct device_d *pdev)
 		omap_gpmc_eccmode(oinfo, pdata->ecc_mode);
 
 	/* We are all set to register with the system now! */
-	err = add_mtd_device(minfo, "nand");
+	err = add_mtd_nand_device(minfo, "nand");
 	if (err) {
 		dev_dbg(pdev, "device registration failed\n");
 		goto out_release_mem;
@@ -1082,10 +1081,4 @@ static struct driver_d gpmc_nand_driver = {
 	.name = "gpmc_nand",
 	.probe = gpmc_nand_probe,
 };
-
-static int gpmc_nand_init(void)
-{
-	return platform_driver_register(&gpmc_nand_driver);
-}
-
-device_initcall(gpmc_nand_init);
+device_platform_driver(gpmc_nand_driver);

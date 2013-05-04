@@ -21,26 +21,14 @@
 #include <mach/imx25-regs.h>
 #include <mach/esdctl.h>
 #include <io.h>
+#include <sizes.h>
 #include <mach/imx-nand.h>
+#include <mach/esdctl.h>
 #include <asm/barebox-arm.h>
 #include <asm/barebox-arm-head.h>
 #include <asm/system.h>
-#include <asm-generic/sections.h>
+#include <asm/sections.h>
 #include <asm-generic/memory_layout.h>
-
-#ifdef CONFIG_NAND_IMX_BOOT
-static void __bare_init __naked insdram(void)
-{
-	uint32_t r;
-
-	/* setup a stack to be able to call imx_nand_load_image() */
-	arm_setup_stack(STACK_BASE + STACK_SIZE - 12);
-
-	imx_nand_load_image(_text, barebox_image_size);
-
-	board_init_lowlevel_return();
-}
-#endif
 
 static inline void __bare_init  setup_sdram(uint32_t base, uint32_t esdctl,
 		uint32_t esdcfg)
@@ -66,14 +54,11 @@ static inline void __bare_init  setup_sdram(uint32_t base, uint32_t esdctl,
 	writel(esdctl, esdctlreg);
 }
 
-void __bare_init __naked reset(void)
+void __bare_init __naked barebox_arm_reset_vector(void)
 {
 	uint32_t r;
-#ifdef CONFIG_NAND_IMX_BOOT
-	unsigned int *trg, *src;
-#endif
 
-	common_reset();
+	arm_cpu_lowlevel_init();
 
 	/* AIPS setup - Only setup MPROTx registers. The PACR default values are good.
 	 * Set all MPROTx to be non-bufferable, trusted for R/W,
@@ -130,8 +115,8 @@ void __bare_init __naked reset(void)
 
 	/* Skip SDRAM initialization if we run from RAM */
 	r = get_pc();
-	if (r > 0x80000000 && r < 0x90000000)
-		board_init_lowlevel_return();
+	if (r > 0x80000000 && r < 0xa0000000)
+		goto out;
 
 	/* set to 3.3v SDRAM */
 	writel(0x800, MX25_IOMUXC_BASE_ADDR + 0x454);
@@ -150,22 +135,11 @@ void __bare_init __naked reset(void)
 	setup_sdram(0x90000000, ESDCTLVAL, ESDCFGVAL);
 
 #ifdef CONFIG_NAND_IMX_BOOT
-	/* skip NAND boot if not running from NFC space */
-	r = get_pc();
-	if (r < MX25_NFC_BASE_ADDR || r > MX25_NFC_BASE_ADDR + 0x800)
-		board_init_lowlevel_return();
+	/* setup a stack to be able to call imx25_barebox_boot_nand_external() */
+	arm_setup_stack(MX25_IRAM_BASE_ADDR + MX25_IRAM_SIZE - 8);
 
-	src = (unsigned int *)MX25_NFC_BASE_ADDR;
-	trg = (unsigned int *)_text;
-
-	/* Move ourselves out of NFC SRAM */
-	for (i = 0; i < 0x800 / sizeof(int); i++)
-		*trg++ = *src++;
-
-	/* Jump to SDRAM */
-	r = (unsigned int)&insdram;
-	__asm__ __volatile__("mov pc, %0" : : "r"(r));
-#else
-	board_init_lowlevel_return();
+	imx25_barebox_boot_nand_external();
 #endif
+out:
+	imx25_barebox_entry(0);
 }

@@ -20,11 +20,13 @@
 #include <common.h>
 #include <of.h>
 #include <errno.h>
-#include <libfdt.h>
 #include <malloc.h>
 #include <init.h>
 #include <memory.h>
+#include <sizes.h>
 #include <linux/ctype.h>
+#include <linux/amba/bus.h>
+#include <linux/err.h>
 
 /**
  * struct alias_prop - Alias property in 'aliases' node
@@ -48,8 +50,6 @@ struct alias_prop {
 static LIST_HEAD(aliases_lookup);
 
 static LIST_HEAD(phandle_list);
-
-static LIST_HEAD(allnodes);
 
 struct device_node *root_node;
 
@@ -96,7 +96,7 @@ static void of_bus_default_count_cells(struct device_node *dev,
 		*sizec = of_n_size_cells(dev);
 }
 
-void of_bus_count_cells(struct device_node *dev,
+static void of_bus_count_cells(struct device_node *dev,
 			int *addrc, int *sizec)
 {
 	of_bus_default_count_cells(dev, addrc, sizec);
@@ -135,11 +135,17 @@ static void of_alias_add(struct alias_prop *ap, struct device_node *np,
  * the global lookup table with the properties.  It returns the
  * number of alias_prop found, or error code in error case.
  */
-void of_alias_scan(void)
+static void of_alias_scan(void)
 {
 	struct property *pp;
+	struct alias_prop *app, *tmp;
 
-	of_aliases = of_find_node_by_path("/aliases");
+	list_for_each_entry_safe(app, tmp, &aliases_lookup, link)
+		free(app);
+
+	INIT_LIST_HEAD(&aliases_lookup);
+
+	of_aliases = of_find_node_by_path(root_node, "/aliases");
 	if (!of_aliases)
 		return;
 
@@ -156,7 +162,7 @@ void of_alias_scan(void)
 		    !strcmp(pp->name, "linux,phandle"))
 			continue;
 
-		np = of_find_node_by_path(pp->value);
+		np = of_find_node_by_path(root_node, pp->value);
 		if (!np)
 			continue;
 
@@ -343,6 +349,31 @@ int of_property_read_u32_array(const struct device_node *np,
 }
 EXPORT_SYMBOL_GPL(of_property_read_u32_array);
 
+int of_property_write_u32_array(struct device_node *np,
+				const char *propname, const u32 *values,
+				size_t sz)
+{
+	struct property *prop = of_find_property(np, propname);
+	__be32 *val;
+
+	if (!prop)
+		prop = of_new_property(np, propname, NULL, 0);
+	if (!prop)
+		return -ENOMEM;
+
+	free(prop->value);
+
+	prop->value = malloc(sizeof(__be32) * sz);
+	if (!prop->value)
+		return -ENOMEM;
+
+	val = prop->value;
+
+	while (sz--)
+		*val++ = cpu_to_be32(*values++);
+	return 0;
+}
+
 /**
  * of_parse_phandles_with_args - Find a node pointed by phandle in a list
  * @np:		pointer to a device tree node containing a list
@@ -476,20 +507,45 @@ EXPORT_SYMBOL(of_machine_is_compatible);
 
 /**
  *	of_find_node_by_path - Find a node matching a full OF path
+ *	@root:	The root node of this tree
  *	@path:	The full path to match
  *
  *	Returns a node pointer with refcount incremented, use
  *	of_node_put() on it when done.
  */
-struct device_node *of_find_node_by_path(const char *path)
+struct device_node *of_find_node_by_path(struct device_node *root, const char *path)
 {
-	struct device_node *np;
+	char *slash, *p, *freep;
+	struct device_node *dn = root;
 
-	list_for_each_entry(np, &allnodes, list) {
-		if (np->full_name && (strcmp(np->full_name, path) == 0))
-			break;
+	if (*path != '/')
+		return NULL;
+
+	path++;
+
+	freep = p = xstrdup(path);
+
+	while (1) {
+		if (!*p)
+			goto out;
+
+		slash = strchr(p, '/');
+		if (slash)
+			*slash = 0;
+
+		dn = of_find_child_by_name(dn, p);
+		if (!dn)
+			goto out;
+
+		if (!slash)
+			goto out;
+
+		p = slash + 1;
 	}
-	return np;
+out:
+	free(freep);
+
+	return dn;
 }
 EXPORT_SYMBOL(of_find_node_by_path);
 
@@ -526,6 +582,18 @@ EXPORT_SYMBOL_GPL(of_property_read_string);
 struct device_node *of_get_root_node(void)
 {
 	return root_node;
+}
+
+int of_set_root_node(struct device_node *node)
+{
+	if (node && root_node)
+		return -EBUSY;
+
+	root_node = node;
+
+	of_alias_scan();
+
+	return 0;
 }
 
 static int of_node_disabled(struct device_node *node)
@@ -574,7 +642,7 @@ void of_print_nodes(struct device_node *node, int indent)
 	printf("};\n");
 }
 
-static struct device_node *new_device_node(struct device_node *parent)
+struct device_node *of_new_node(struct device_node *parent, const char *name)
 {
 	struct device_node *node;
 
@@ -586,10 +654,20 @@ static struct device_node *new_device_node(struct device_node *parent)
 	INIT_LIST_HEAD(&node->children);
 	INIT_LIST_HEAD(&node->properties);
 
+	if (parent) {
+		node->name = xstrdup(name);
+		node->full_name = asprintf("%s/%s", node->parent->full_name, name);
+		list_add(&node->list, &parent->list);
+	} else {
+		node->name = xstrdup("");
+		node->full_name = xstrdup("");
+		INIT_LIST_HEAD(&node->list);
+	}
+
 	return node;
 }
 
-static struct property *new_property(struct device_node *node, const char *name,
+struct property *of_new_property(struct device_node *node, const char *name,
 		const void *data, int len)
 {
 	struct property *prop;
@@ -598,26 +676,98 @@ static struct property *new_property(struct device_node *node, const char *name,
 
 	prop->name = strdup(name);
 	prop->length = len;
-	prop->value = xzalloc(len);
-	memcpy(prop->value, data, len);
+	if (len) {
+		prop->value = xzalloc(len);
+		memcpy(prop->value, data, len);
+	}
 
 	list_add_tail(&prop->list, &node->properties);
 
 	return prop;
 }
 
-static struct device_d *add_of_device(struct device_node *node)
+void of_delete_property(struct property *pp)
+{
+	list_del(&pp->list);
+
+	free(pp->name);
+	free(pp->value);
+	free(pp);
+}
+
+/**
+ * of_set_property - create a property for a given node
+ * @node - the node
+ * @name - the name of the property
+ * @val - the value for the property
+ * @len - the length of the properties value
+ * @create - if true, the property is created if not existing already
+ */
+int of_set_property(struct device_node *np, const char *name, const void *val, int len,
+		int create)
+{
+	struct property *pp;
+
+	if (!np)
+		return -ENOENT;
+
+	pp = of_find_property(np, name);
+	if (pp) {
+		void *data;
+
+		free(pp->value);
+		data = xzalloc(len);
+		memcpy(data, val, len);
+		pp->value = data;
+		pp->length = len;
+	} else {
+		if (!create)
+			return -ENOENT;
+
+		pp = of_new_property(np, name, val, len);
+	}
+
+	return 0;
+}
+
+static struct device_d *add_of_amba_device(struct device_node *node)
+{
+	struct amba_device *dev;
+	char *name, *at;
+
+	dev = xzalloc(sizeof(*dev));
+
+	name = xstrdup(node->name);
+	at = strchr(name, '@');
+	if (at) {
+		*at = 0;
+		snprintf(dev->dev.name, MAX_DRIVER_NAME, "%s.%s", at + 1, name);
+	} else {
+		strncpy(dev->dev.name, node->name, MAX_DRIVER_NAME);
+	}
+
+	dev->dev.id = DEVICE_ID_SINGLE;
+	memcpy(&dev->res, &node->resource[0], sizeof(struct resource));
+	dev->dev.resource = node->resource;
+	dev->dev.num_resources = 1;
+	dev->dev.device_node = node;
+	node->device = &dev->dev;
+
+	of_property_read_u32(node, "arm,primecell-periphid", &dev->periphid);
+
+	debug("register device 0x%08x\n", node->resource[0].start);
+
+	amba_device_add(dev);
+
+	free(name);
+
+	return &dev->dev;
+}
+
+static struct device_d *add_of_platform_device(struct device_node *node)
 {
 	struct device_d *dev;
 	char *name, *at;
-	const struct property *cp;
-
-	if (of_node_disabled(node))
-		return NULL;
-
-	cp = of_get_property(node, "compatible", NULL);
-	if (!cp)
-		return NULL;
 
 	dev = xzalloc(sizeof(*dev));
 
@@ -644,9 +794,27 @@ static struct device_d *add_of_device(struct device_node *node)
 
 	return dev;
 }
+
+static struct device_d *add_of_device(struct device_node *node)
+{
+	const struct property *cp;
+
+	if (of_node_disabled(node))
+		return NULL;
+
+	cp = of_get_property(node, "compatible", NULL);
+	if (!cp)
+		return NULL;
+
+	if (IS_ENABLED(CONFIG_ARM_AMBA) &&
+	    of_device_is_compatible(node, "arm,primecell") == 1)
+		return add_of_amba_device(node);
+	else
+		return add_of_platform_device(node);
+}
 EXPORT_SYMBOL(add_of_device);
 
-u64 dt_mem_next_cell(int s, const __be32 **cellp)
+static u64 dt_mem_next_cell(int s, const __be32 **cellp)
 {
 	const __be32 *p = *cellp;
 
@@ -654,18 +822,26 @@ u64 dt_mem_next_cell(int s, const __be32 **cellp)
 	return of_read_number(p, s);
 }
 
-static int of_add_memory(struct device_node *node)
+int of_add_memory(struct device_node *node, bool dump)
 {
 	int na, nc;
 	const __be32 *reg, *endp;
-	int len, r = 0;
+	int len, r = 0, ret;
 	static char str[6];
+	const char *device_type;
+
+	ret = of_property_read_string(node, "device_type", &device_type);
+	if (ret)
+		return -ENXIO;
+
+	if (strcmp(device_type, "memory"))
+		return -ENXIO;
 
 	of_bus_count_cells(node, &na, &nc);
 
 	reg = of_get_property(node, "reg", &len);
 	if (!reg)
-		return 0;
+		return -EINVAL;
 
 	endp = reg + (len / sizeof(__be32));
 
@@ -680,17 +856,20 @@ static int of_add_memory(struct device_node *node)
 
 		sprintf(str, "ram%d", r);
 
-                barebox_add_memory_bank(str, base, size);
+		barebox_add_memory_bank(str, base, size);
+
+		if (dump)
+			pr_info("%s: %s: 0x%llx@0x%llx\n", node->name, str, size, base);
 
 		r++;
-        }
+	}
 
 	return 0;
 }
 
 static int add_of_device_resource(struct device_node *node)
 {
-	struct property *reg, *type;
+	struct property *reg;
 	u64 address, size;
 	struct resource *res;
 	struct device_d *dev;
@@ -703,9 +882,9 @@ static int add_of_device_resource(struct device_node *node)
 		list_add_tail(&node->phandles, &phandle_list);
 	}
 
-	type = of_find_property(node, "device_type");
-	if (type)
-		return of_add_memory(node);
+	ret = of_add_memory(node, false);
+	if (ret != -ENXIO)
+		return ret;
 
 	reg = of_find_property(node, "reg");
 	if (!reg)
@@ -765,8 +944,10 @@ void of_free(struct device_node *node)
 		of_free(n);
 	}
 
-	if (node->parent)
+	if (node->parent) {
 		list_del(&node->parent_list);
+		list_del(&node->list);
+	}
 
 	if (node->device)
 		node->device->device_node = NULL;
@@ -776,6 +957,9 @@ void of_free(struct device_node *node)
 	free(node->name);
 	free(node->full_name);
 	free(node);
+
+	if (node == root_node)
+		of_set_root_node(NULL);
 }
 
 static void __of_probe(struct device_node *node)
@@ -804,7 +988,7 @@ int of_probe(void)
 	if(!root_node)
 		return -ENODEV;
 
-	of_chosen = of_find_node_by_path("/chosen");
+	of_chosen = of_find_node_by_path(root_node, "/chosen");
 	of_property_read_string(root_node, "model", &of_model);
 
 	__of_probe(root_node);
@@ -812,84 +996,59 @@ int of_probe(void)
 	return 0;
 }
 
-/*
- * Parse a flat device tree binary blob and store it in the barebox
- * internal tree format,
- */
-int of_parse_dtb(struct fdt_header *fdt)
+struct device_node *of_find_child_by_name(struct device_node *node, const char *name)
 {
-	const void *nodep;	/* property node pointer */
-	int  nodeoffset;	/* node offset from libfdt */
-	int  nextoffset;	/* next node offset from libfdt */
-	uint32_t tag;		/* tag */
-	int  len;		/* length of the property */
-	int  level = 0;		/* keep track of nesting level */
-	const struct fdt_property *fdt_prop;
-	const char *pathp;
-	int depth = 10000;
-	struct device_node *node = NULL;
-	char buf[1024];
-	int ret;
+	struct device_node *_n;
 
-	if (root_node)
-		return -EBUSY;
+	device_node_for_nach_child(node, _n)
+		if (!strcmp(_n->name, name))
+			return _n;
 
-	nodeoffset = fdt_path_offset(fdt, "/");
-	if (nodeoffset < 0) {
-		/*
-		 * Not found or something else bad happened.
-		 */
-		printf ("libfdt fdt_path_offset() returned %s\n",
-			fdt_strerror(nodeoffset));
-		return -EINVAL;
-	}
+	return NULL;
+}
+
+/**
+ * of_create_node - create a new node including its parents
+ * @path - the nodepath to create
+ */
+struct device_node *of_create_node(struct device_node *root, const char *path)
+{
+	char *slash, *p, *freep;
+	struct device_node *tmp, *dn = root;
+
+	if (*path != '/')
+		return NULL;
+
+	path++;
+
+	p = freep = xstrdup(path);
 
 	while (1) {
-		tag = fdt_next_tag(fdt, nodeoffset, &nextoffset);
-		switch (tag) {
-		case FDT_BEGIN_NODE:
-			pathp = fdt_get_name(fdt, nodeoffset, NULL);
+		if (!*p)
+			goto out;
 
-			if (pathp == NULL)
-				pathp = "/* NULL pointer error */";
+		slash = strchr(p, '/');
+		if (slash)
+			*slash = 0;
 
-			ret = fdt_get_path(fdt, nodeoffset, buf, 1024);
-			if (ret)
-				return -EINVAL;
+		tmp = of_find_child_by_name(dn, p);
+		if (tmp)
+			dn = tmp;
+		else
+			dn = of_new_node(dn, p);
 
-			node = new_device_node(node);
-			if (!node->parent)
-				root_node = node;
-			node->full_name = xstrdup(buf);
-			node->name = xstrdup(pathp);
-			list_add_tail(&node->list, &allnodes);
-			break;
-		case FDT_END_NODE:
-			node = node->parent;
-			break;
-		case FDT_PROP:
-			fdt_prop = fdt_offset_ptr(fdt, nodeoffset,
-					sizeof(*fdt_prop));
-			pathp    = fdt_string(fdt,
-					fdt32_to_cpu(fdt_prop->nameoff));
-			len      = fdt32_to_cpu(fdt_prop->len);
-			nodep    = fdt_prop->data;
-			new_property(node, pathp, nodep, len);
-			break;
-		case FDT_NOP:
-			break;
-		case FDT_END:
-			of_alias_scan();
-			return 0;
-		default:
-			if (level <= depth)
-				printf("Unknown tag 0x%08X\n", tag);
-			return -EINVAL;
-		}
-		nodeoffset = nextoffset;
+		if (!dn)
+			goto out;
+
+		if (!slash)
+			goto out;
+
+		p = slash + 1;
 	}
+out:
+	free(freep);
 
-	return 0;
+	return dn;
 }
 
 int of_device_is_stdout_path(struct device_d *dev)
@@ -900,13 +1059,56 @@ int of_device_is_stdout_path(struct device_d *dev)
 	name = of_get_property(of_chosen, "linux,stdout-path", NULL);
 	if (name == NULL)
 		return 0;
-	dn = of_find_node_by_path(name);
+	dn = of_find_node_by_path(root_node, name);
 
 	if (!dn)
 		return 0;
 
 	if (dn == dev->device_node)
 		return 1;
+
+	return 0;
+}
+
+/**
+ * of_add_initrd - add initrd properties to the devicetree
+ * @root - the root node of the tree
+ * @start - physical start address of the initrd image
+ * @end - physical end address of the initrd image
+ *
+ * Add initrd properties to the devicetree, or, if end is 0,
+ * delete them.
+ *
+ * Note that Linux interprets end differently than barebox. For Linux end points
+ * to the first address after the memory occupied by the image while barebox
+ * lets end pointing to the last occupied byte.
+ */
+int of_add_initrd(struct device_node *root, resource_size_t start,
+		resource_size_t end)
+{
+	struct device_node *chosen;
+	__be32 buf[2];
+
+	chosen = of_find_node_by_path(root, "/chosen");
+	if (!chosen)
+		return -EINVAL;
+
+	if (end) {
+		of_write_number(buf, start, 2);
+		of_set_property(chosen, "linux,initrd-start", buf, 8, 1);
+		of_write_number(buf, end + 1, 2);
+		of_set_property(chosen, "linux,initrd-end", buf, 8, 1);
+	} else {
+		struct property *pp;
+
+		pp = of_find_property(chosen, "linux,initrd-start");
+		if (pp)
+			of_delete_property(pp);
+
+		pp = of_find_property(chosen, "linux,initrd-end");
+		if (pp)
+			of_delete_property(pp);
+	}
 
 	return 0;
 }

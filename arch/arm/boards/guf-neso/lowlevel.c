@@ -27,32 +27,17 @@
 #include <asm/barebox-arm.h>
 #include <asm/barebox-arm-head.h>
 #include <asm/system.h>
-#include <asm-generic/sections.h>
+#include <asm/sections.h>
 #include <asm-generic/memory_layout.h>
-
-#ifdef CONFIG_NAND_IMX_BOOT
-static void __bare_init __naked insdram(void)
-{
-	/* setup a stack to be able to call imx_nand_load_image() */
-	arm_setup_stack(STACK_BASE + STACK_SIZE - 12);
-
-	imx_nand_load_image(_text, barebox_image_size);
-
-	board_init_lowlevel_return();
-}
-#endif
 
 #define ESDCTL0_VAL (ESDCTL0_SDE | ESDCTL0_ROW13 | ESDCTL0_COL10)
 
-void __bare_init __naked reset(void)
+void __bare_init __naked barebox_arm_reset_vector(void)
 {
 	uint32_t r;
 	int i;
-#ifdef CONFIG_NAND_IMX_BOOT
-	unsigned int *trg, *src;
-#endif
 
-	common_reset();
+	arm_cpu_lowlevel_init();
 
 	/* ahb lite ip interface */
 	writel(0x20040304, MX27_AIPI_BASE_ADDR + MX27_AIPI1_PSR0);
@@ -63,7 +48,7 @@ void __bare_init __naked reset(void)
 	/* Skip SDRAM initialization if we run from RAM */
 	r = get_pc();
 	if (r > 0xa0000000 && r < 0xb0000000)
-		board_init_lowlevel_return();
+		goto out;
 
 	/*
 	 * DDR on CSD0
@@ -102,23 +87,11 @@ void __bare_init __naked reset(void)
 			MX27_ESDCTL_BASE_ADDR + IMX_ESDCTL0);
 
 #ifdef CONFIG_NAND_IMX_BOOT
-	/* skip NAND boot if not running from NFC space */
-	r = get_pc();
-	if (r < MX27_NFC_BASE_ADDR || r > MX27_NFC_BASE_ADDR + 0x800)
-		board_init_lowlevel_return();
+	/* setup a stack to be able to call imx27_barebox_boot_nand_external() */
+	arm_setup_stack(MX27_IRAM_BASE_ADDR + MX27_IRAM_SIZE - 8);
 
-	src = (unsigned int *)MX27_NFC_BASE_ADDR;
-	trg = (unsigned int *)_text;
-
-	/* Move ourselves out of NFC SRAM */
-	for (i = 0; i < 0x800 / sizeof(int); i++)
-		*trg++ = *src++;
-
-	/* Jump to SDRAM */
-	r = (unsigned int)&insdram;
-	__asm__ __volatile__("mov pc, %0" : : "r"(r));
-#else
-	board_init_lowlevel_return();
+	imx27_barebox_boot_nand_external();
 #endif
+out:
+	imx27_barebox_entry(0);
 }
-

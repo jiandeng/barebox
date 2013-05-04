@@ -1496,12 +1496,19 @@ static int __init at91udc_probe(struct device_d *dev)
 	at91_udp_write(udc, AT91_UDP_ICR, 0xffffffff);
 	clk_disable(udc->iclk);
 
-	if (udc->board.vbus_pin > 0) {
+	if (gpio_is_valid(udc->board.vbus_pin)) {
+		retval = gpio_request(udc->board.vbus_pin, "udc_vbus");
+		if (retval < 0) {
+			dev_err(dev, "request vbus pin failed\n");
+			goto fail0a;
+		}
+		gpio_direction_input(udc->board.vbus_pin);
+
 		/*
 		 * Get the initial state of VBUS - we cannot expect
 		 * a pending interrupt.
 		 */
-		udc->vbus = at91_get_gpio_value(udc->board.vbus_pin);
+		udc->vbus = gpio_get_value(udc->board.vbus_pin);
 		DBG(udc, "VBUS detection: host:%s \n",
 			udc->vbus ? "present":"absent");
 	} else {
@@ -1530,10 +1537,4 @@ static struct driver_d at91_udc_driver = {
 	.name	= driver_name,
 	.probe	= at91udc_probe,
 };
-
-static int at91_udc_init(void)
-{
-	platform_driver_register(&at91_udc_driver);
-	return 0;
-}
-device_initcall(at91_udc_init);
+device_platform_driver(at91_udc_driver);

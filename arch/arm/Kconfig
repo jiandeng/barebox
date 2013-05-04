@@ -2,14 +2,10 @@ config ARM
 	bool
 	select HAS_KALLSYMS
 	select HAS_MODULES
-	select HAVE_CONFIGURABLE_MEMORY_LAYOUT
 	select HAVE_CONFIGURABLE_TEXT_BASE
 	select HAVE_PBL_IMAGE
 	select HAVE_IMAGE_COMPRESSION
 	default y
-
-config ARM_AMBA
-	bool
 
 config ARM_LINUX
 	bool
@@ -21,12 +17,20 @@ config HAVE_MACH_ARM_HEAD
 
 menu "System Type"
 
+config BUILTIN_DTB
+	bool "link a DTB into the barebox image"
+	depends on OFTREE
+
+config BUILTIN_DTB_NAME
+	string "DTB to build into the barebox image"
+	depends on BUILTIN_DTB
+
 choice
 	prompt "ARM system type"
 
 config ARCH_AT91
 	bool "Atmel AT91"
-	select GENERIC_GPIO
+	select GPIOLIB
 	select CLKDEV_LOOKUP
 	select HAS_DEBUG_LL
 	select HAVE_MACH_ARM_HEAD
@@ -43,12 +47,28 @@ config ARCH_BCM2835
 config ARCH_CLPS711X
 	bool "Cirrus Logic EP711x/EP721x/EP731x"
 	select CLKDEV_LOOKUP
+	select CLOCKSOURCE_CLPS711X
+	select COMMON_CLK
 	select CPU_32v4T
+	select GPIOLIB
+	select MFD_SYSCON
 
 config ARCH_EP93XX
 	bool "Cirrus Logic EP93xx"
 	select CPU_ARM920T
 	select GENERIC_GPIO
+
+config ARCH_HIGHBANK
+	bool "Calxeda Highbank"
+	select HAS_DEBUG_LL
+	select HAS_POWEROFF
+	select ARCH_HAS_L2X0
+	select CPU_V7
+	select ARM_AMBA
+	select AMBA_SP804
+	select CLKDEV_LOOKUP
+	select COMMON_CLK
+	select GPIOLIB
 
 config ARCH_IMX
 	bool "Freescale iMX-based"
@@ -106,9 +126,22 @@ config ARCH_VERSATILE
 	select CPU_ARM926T
 	select GPIOLIB
 
+config ARCH_VEXPRESS
+	bool "ARM Vexpres boards"
+	select HAS_DEBUG_LL
+	select CPU_V7
+	select ARM_AMBA
+	select AMBA_SP804
+	select CLKDEV_LOOKUP
+	select COMMON_CLK
+
 config ARCH_TEGRA
 	bool "Nvidia Tegra-based boards"
 	select CPU_ARM926T
+	select HAS_DEBUG_LL
+
+config ARCH_ZYNQ
+	bool "Xilinx Zynq-based boards"
 	select HAS_DEBUG_LL
 
 endchoice
@@ -118,6 +151,7 @@ source arch/arm/mach-at91/Kconfig
 source arch/arm/mach-bcm2835/Kconfig
 source arch/arm/mach-clps711x/Kconfig
 source arch/arm/mach-ep93xx/Kconfig
+source arch/arm/mach-highbank/Kconfig
 source arch/arm/mach-imx/Kconfig
 source arch/arm/mach-mxs/Kconfig
 source arch/arm/mach-netx/Kconfig
@@ -126,7 +160,9 @@ source arch/arm/mach-omap/Kconfig
 source arch/arm/mach-pxa/Kconfig
 source arch/arm/mach-samsung/Kconfig
 source arch/arm/mach-versatile/Kconfig
+source arch/arm/mach-vexpress/Kconfig
 source arch/arm/mach-tegra/Kconfig
+source arch/arm/mach-zynq/Kconfig
 
 config ARM_ASM_UNIFIED
 	bool
@@ -151,6 +187,13 @@ config THUMB2_BAREBOX
 	  fixups since most assembly code is derived from the Kernel. However,
 	  your board lowlevel init code may break in thumb-2 mode. You have been
 	  warned.
+
+config ARM_BOARD_APPEND_ATAG
+	bool "Let board specific code to add ATAGs to be passed to the kernel"
+	depends on ARM_LINUX
+	help
+	  This option is purely to start some vendor provided kernels.
+	  ** DO NOT USE FOR YOUR OWN DESIGNS! **
 
 endmenu
 

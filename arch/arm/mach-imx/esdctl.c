@@ -127,32 +127,18 @@ static inline unsigned long imx_v4_sdram_size(void __iomem *esdctlbase, int cs)
 		return 0;
 	if (cs == 1 && !(ctlval & ESDCTL_V4_ESDCTLx_SDE1))
 		return 0;
-
 	/* one 2GiB cs, memory is returned for cs0 only */
 	if (cs == 1 && (esdmisc & ESDCTL_V4_ESDMISC_ONE_CS))
-		return 9;
-
+		return 0;
 	rows = ((ctlval >> 24) & 0x7) + 11;
-	switch ((ctlval >> 20) & 0x7) {
-	case 0:
-		cols = 9;
-		break;
-	case 1:
-		cols = 10;
-		break;
-	case 2:
-		cols = 11;
-		break;
-	case 3:
+
+	cols = (ctlval >> 20) & 0x7;
+	if (cols == 3)
 		cols = 8;
-		break;
-	case 4:
+	else if (cols == 4)
 		cols = 12;
-		break;
-	default:
-		cols = 0;
-		break;
-	}
+	else
+		cols += 9;
 
 	if (ctlval & ESDCTL_V4_ESDCTLx_DSIZ_32B)
 		width = 4;
@@ -168,8 +154,8 @@ static inline unsigned long imx_v4_sdram_size(void __iomem *esdctlbase, int cs)
 static void add_mem(unsigned long base0, unsigned long size0,
 		unsigned long base1, unsigned long size1)
 {
-	debug("%s: cs0 base: 0x%08x cs0 size: 0x%08x\n", __func__, base0, size0);
-	debug("%s: cs1 base: 0x%08x cs1 size: 0x%08x\n", __func__, base1, size1);
+	debug("%s: cs0 base: 0x%08lx cs0 size: 0x%08lx\n", __func__, base0, size0);
+	debug("%s: cs1 base: 0x%08lx cs1 size: 0x%08lx\n", __func__, base1, size1);
 
 	if (base0 + size0 == base1 && size1 > 0) {
 		/*
@@ -187,6 +173,26 @@ static void add_mem(unsigned long base0, unsigned long size0,
 		arm_add_mem_device(size0 ? "ram1" : "ram0", base1, size1);
 }
 
+/*
+ * On i.MX27, i.MX31 and i.MX35 the second chipselect is enabled by reset default.
+ * This setting makes it impossible to detect the correct SDRAM size on
+ * these SoCs. We disable the chipselect if this reset default setting is
+ * found. This of course leads to incorrect SDRAM detection on boards which
+ * really have this reset default as a valid setting. If you have such a
+ * board drop a mail to search for a solution.
+ */
+#define ESDCTL1_RESET_DEFAULT 0x81120080
+
+static inline void imx_esdctl_v2_disable_default(void *esdctlbase)
+{
+	u32 ctlval = readl(esdctlbase + IMX_ESDCTL1);
+
+	if (ctlval == ESDCTL1_RESET_DEFAULT) {
+		ctlval &= ~(1 << 31);
+		writel(ctlval, esdctlbase + IMX_ESDCTL1);
+	}
+}
+
 static void imx_esdctl_v1_add_mem(void *esdctlbase, struct imx_esdctl_data *data)
 {
 	add_mem(data->base0, imx_v1_sdram_size(esdctlbase, 0),
@@ -199,22 +205,9 @@ static void imx_esdctl_v2_add_mem(void *esdctlbase, struct imx_esdctl_data *data
 			data->base1, imx_v2_sdram_size(esdctlbase, 1));
 }
 
-/*
- * On i.MX27 and i.MX31 the second chipselect is enabled by reset default.
- * This setting makes it impossible to detect the correct SDRAM size on
- * these SoCs. We disable the chipselect if this reset default setting is
- * found. This of course leads to incorrect SDRAM detection on boards which
- * really have this reset default as a valid setting. If you have such a
- * board drop a mail to search for a solution.
- */
-#define ESDCTL1_RESET_DEFAULT 0x81120080
-
 static void imx_esdctl_v2_bug_add_mem(void *esdctlbase, struct imx_esdctl_data *data)
 {
-	u32 ctlval = readl(esdctlbase + IMX_ESDCTL1);
-
-	if (ctlval == ESDCTL1_RESET_DEFAULT)
-		writel(0x0, esdctlbase + IMX_ESDCTL1);
+	imx_esdctl_v2_disable_default(esdctlbase);
 
 	add_mem(data->base0, imx_v2_sdram_size(esdctlbase, 0),
 			data->base1, imx_v2_sdram_size(esdctlbase, 1));
@@ -278,7 +271,7 @@ static __maybe_unused struct imx_esdctl_data imx31_data = {
 static __maybe_unused struct imx_esdctl_data imx35_data = {
 	.base0 = MX35_CSD0_BASE_ADDR,
 	.base1 = MX35_CSD1_BASE_ADDR,
-	.add_mem = imx_esdctl_v2_add_mem,
+	.add_mem = imx_esdctl_v2_bug_add_mem,
 };
 
 static __maybe_unused struct imx_esdctl_data imx51_data = {
@@ -353,3 +346,117 @@ static int imx_esdctl_init(void)
 }
 
 mem_initcall(imx_esdctl_init);
+
+/*
+ * The i.MX SoCs usually have two SDRAM chipselects. The following
+ * SoC specific functions return:
+ *
+ * - cs0 disabled, cs1 disabled: 0
+ * - cs0 enabled, cs1 disabled: SDRAM size for cs0
+ * - cs0 disabled, c1 enabled: 0 (currently assumed that no hardware does this)
+ * - cs0 enabled, cs1 enabled: The largest continuous region, that is, cs0 + cs1
+ *                             if cs0 is taking the whole address space.
+ */
+void __naked __noreturn imx1_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	base = MX1_CSD0_BASE_ADDR;
+
+	size = imx_v1_sdram_size((void *)MX1_SDRAMC_BASE_ADDR, 0);
+	if (size == SZ_64M)
+		size += imx_v1_sdram_size((void *)MX1_SDRAMC_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx25_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	base = MX25_CSD0_BASE_ADDR;
+
+	size = imx_v2_sdram_size((void *)MX25_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_256M)
+		size += imx_v2_sdram_size((void *)MX25_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx27_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	imx_esdctl_v2_disable_default((void *)MX27_ESDCTL_BASE_ADDR);
+
+	base = MX27_CSD0_BASE_ADDR;
+
+	size = imx_v2_sdram_size((void *)MX27_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_256M)
+		size += imx_v2_sdram_size((void *)MX27_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx31_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	imx_esdctl_v2_disable_default((void *)MX31_ESDCTL_BASE_ADDR);
+
+	base = MX31_CSD0_BASE_ADDR;
+
+	size = imx_v2_sdram_size((void *)MX31_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_256M)
+		size += imx_v2_sdram_size((void *)MX31_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx35_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	imx_esdctl_v2_disable_default((void *)MX35_ESDCTL_BASE_ADDR);
+
+	base = MX35_CSD0_BASE_ADDR;
+
+	size = imx_v2_sdram_size((void *)MX35_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_256M)
+		size += imx_v2_sdram_size((void *)MX35_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx51_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	base = MX51_CSD0_BASE_ADDR;
+
+	size = imx_v3_sdram_size((void *)MX51_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_256M)
+		size += imx_v3_sdram_size((void *)MX51_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}
+
+void __naked __noreturn imx53_barebox_entry(uint32_t boarddata)
+{
+	unsigned long base;
+	unsigned long size;
+
+	base = MX53_CSD0_BASE_ADDR;
+
+	size = imx_v4_sdram_size((void *)MX53_ESDCTL_BASE_ADDR, 0);
+	if (size == SZ_1G)
+		size += imx_v4_sdram_size((void *)MX53_ESDCTL_BASE_ADDR, 1);
+
+	barebox_arm_entry(base, size, boarddata);
+}

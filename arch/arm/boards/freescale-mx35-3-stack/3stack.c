@@ -30,10 +30,11 @@
 #include <init.h>
 #include <nand.h>
 #include <net.h>
+#include <sizes.h>
 #include <partition.h>
 
 #include <asm/armlinux.h>
-#include <asm-generic/sections.h>
+#include <asm/sections.h>
 #include <asm/barebox-arm.h>
 #include <io.h>
 #include <generated/mach-types.h>
@@ -59,7 +60,7 @@
 #define MX35PDK_BOARD_REV_2		1
 
 static struct fec_platform_data fec_info = {
-	.xcv_type	= MII100,
+	.xcv_type	= PHY_INTERFACE_MODE_MII,
 	.phy_addr	= 0x1F,
 };
 
@@ -427,15 +428,3 @@ static int f3s_pmic_init(void)
 }
 
 late_initcall(f3s_pmic_init);
-
-#ifdef CONFIG_NAND_IMX_BOOT
-void __bare_init nand_boot(void)
-{
-	/*
-	 * The driver is able to detect NAND's pagesize by CPU internal
-	 * fuses or external pull ups. But not the blocksize...
-	 */
-	imx_nand_load_image(_text, barebox_image_size);
-	board_init_lowlevel_return();
-}
-#endif

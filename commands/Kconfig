@@ -57,6 +57,13 @@ config CMD_READLINE
 	tristate
 	prompt "readline"
 
+config CMD_LET
+	tristate
+	prompt "let"
+	help
+	  the 'let' command is used for arithmetics. It works like the corresponding
+	  Unix shell command.
+
 config CMD_TRUE
 	tristate
 	default y
@@ -260,6 +267,7 @@ endmenu
 menu "memory"
 
 config CMD_LOADB
+	depends on !CONSOLE_NONE
 	select CRC16
 	tristate
 	prompt "loadb"
@@ -267,10 +275,12 @@ config CMD_LOADB
 config CMD_LOADY
 	select CRC16
 	select XYMODEM
+	depends on !CONSOLE_NONE
 	tristate
 	prompt "loady"
 
 config CMD_LOADS
+	depends on !CONSOLE_NONE
 	tristate
 	prompt "loads"
 
@@ -346,6 +356,14 @@ config CMD_UBI
 	default y if UBI
 	depends on UBI
 	prompt "ubimkvol, ubirmvol, ubiattach"
+
+config CMD_UBIFORMAT
+	tristate
+	depends on UBI
+	select LIBMTD
+	select LIBSCAN
+	select LIBUBIGEN
+	prompt "ubiformat"
 
 endmenu
 
@@ -468,13 +486,20 @@ config CMD_OFTREE
 	  The oftree command has support for dumping devicetrees and, if
 	  enabled, to probe devices from the devicetree
 
-config CMD_OFTREE_PROBE
-	bool
-	depends on CMD_OFTREE
-	select OFDEVICE
-	prompt "oftree probe support"
+config CMD_OF_PROPERTY
+	tristate
+	select OFTREE
+	prompt "of_property"
 	help
-	  This enables the -p option to probe devices from the devicetree
+	  The of_property command allows setting and deleting of properties in
+	  the currently loaded devicetree.
+
+config CMD_OF_NODE
+	tristate
+	select OFTREE
+	prompt "of_node"
+	help
+	  The of_property command allows adding and removing devicetree nodes.
 
 endmenu
 

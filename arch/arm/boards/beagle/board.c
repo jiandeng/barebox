@@ -55,189 +55,15 @@
 #include <ns16550.h>
 #include <asm/armlinux.h>
 #include <generated/mach-types.h>
-#include <mach/silicon.h>
-#include <mach/sdrc.h>
-#include <mach/sys_info.h>
-#include <mach/syslib.h>
-#include <mach/control.h>
-#include <mach/omap3-mux.h>
 #include <mach/gpmc.h>
 #include <mach/gpmc_nand.h>
 #include <mach/ehci.h>
+#include <mach/omap3-devices.h>
 #include <i2c/i2c.h>
 #include <linux/err.h>
 #include <usb/ehci.h>
-#include <mach/xload.h>
-
-/******************** Board Boot Time *******************/
-
-/**
- * @brief Do the SDRC initialization for 128Meg Micron DDR for CS0
- *
- * @return void
- */
-static void sdrc_init(void)
-{
-	/* SDRAM software reset */
-	/* No idle ack and RESET enable */
-	writel(0x1A, SDRC_REG(SYSCONFIG));
-	sdelay(100);
-	/* No idle ack and RESET disable */
-	writel(0x18, SDRC_REG(SYSCONFIG));
-
-	/* SDRC Sharing register */
-	/* 32-bit SDRAM on data lane [31:0] - CS0 */
-	/* pin tri-stated = 1 */
-	writel(0x00000100, SDRC_REG(SHARING));
-
-	/* ----- SDRC Registers Configuration --------- */
-	/* SDRC_MCFG0 register */
-	writel(0x02584099, SDRC_REG(MCFG_0));
-
-	/* SDRC_RFR_CTRL0 register */
-	writel(0x54601, SDRC_REG(RFR_CTRL_0));
-
-	/* SDRC_ACTIM_CTRLA0 register */
-	writel(0xA29DB4C6, SDRC_REG(ACTIM_CTRLA_0));
-
-	/* SDRC_ACTIM_CTRLB0 register */
-	writel(0x12214, SDRC_REG(ACTIM_CTRLB_0));
-
-	/* Disble Power Down of CKE due to 1 CKE on combo part */
-	writel(0x00000081, SDRC_REG(POWER));
-
-	/* SDRC_MANUAL command register */
-	/* NOP command */
-	writel(0x00000000, SDRC_REG(MANUAL_0));
-	/* Precharge command */
-	writel(0x00000001, SDRC_REG(MANUAL_0));
-	/* Auto-refresh command */
-	writel(0x00000002, SDRC_REG(MANUAL_0));
-	/* Auto-refresh command */
-	writel(0x00000002, SDRC_REG(MANUAL_0));
-
-	/* SDRC MR0 register Burst length=4 */
-	writel(0x00000032, SDRC_REG(MR_0));
-
-	/* SDRC DLLA control register */
-	writel(0x0000000A, SDRC_REG(DLLA_CTRL));
-
-	return;
-}
-
-/**
- * @brief Do the pin muxing required for Board operation.
- * We enable ONLY the pins we require to set. OMAP provides pins which do not
- * have alternate modes. Such pins done need to be set.
- *
- * See @ref MUX_VAL for description of the muxing mode.
- *
- * @return void
- */
-static void mux_config(void)
-{
-	/* SDRC_D0 - SDRC_D31 default mux mode is mode0 */
-
-	/* GPMC */
-	MUX_VAL(CP(GPMC_A1), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A2), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A3), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A4), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A5), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A6), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A7), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A8), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A9), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_A10), (IDIS | PTD | DIS | M0));
-
-	/* D0-D7 default mux mode is mode0 */
-	MUX_VAL(CP(GPMC_D8), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D9), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D10), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D11), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D12), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D13), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D14), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_D15), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_CLK), (IDIS | PTD | DIS | M0));
-	/* GPMC_NADV_ALE default mux mode is mode0 */
-	/* GPMC_NOE default mux mode is mode0 */
-	/* GPMC_NWE default mux mode is mode0 */
-	/* GPMC_NBE0_CLE default mux mode is mode0 */
-	MUX_VAL(CP(GPMC_NBE0_CLE), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_NBE1), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(GPMC_NWP), (IEN | PTD | DIS | M0));
-	/* GPMC_WAIT0 default mux mode is mode0 */
-	MUX_VAL(CP(GPMC_WAIT1), (IEN | PTU | EN | M0));
-
-	/* SERIAL INTERFACE */
-	MUX_VAL(CP(UART3_CTS_RCTX), (IEN | PTD | EN | M0));
-	MUX_VAL(CP(UART3_RTS_SD), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(UART3_RX_IRRX), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(UART3_TX_IRTX), (IDIS | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_CLK), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_STP), (IDIS | PTU | EN | M0));
-	MUX_VAL(CP(HSUSB0_DIR), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_NXT), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA0), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA1), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA2), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA3), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA4), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA5), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA6), (IEN | PTD | DIS | M0));
-	MUX_VAL(CP(HSUSB0_DATA7), (IEN | PTD | DIS | M0));
-	/* I2C1_SCL default mux mode is mode0 */
-	/* I2C1_SDA default mux mode is mode0 */
-	/* USB EHCI (port 2) */
-	MUX_VAL(CP(MCSPI1_CS3),		(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(MCSPI2_CLK),		(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(MCSPI2_SIMO),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(MCSPI2_SOMI),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(MCSPI2_CS0),		(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(MCSPI2_CS1),		(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D10_ES2),	(IDIS | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D11_ES2),	(IDIS | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D12_ES2),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D13_ES2),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D14_ES2),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(ETK_D15_ES2),	(IEN  | PTU | DIS | M3));
-	MUX_VAL(CP(UART2_RX),		(IEN  | PTD | DIS | M4)) /*GPIO_147*/;
-}
-
-/**
- * @brief The basic entry point for board initialization.
- *
- * This is called as part of machine init (after arch init).
- * This is again called with stack in SRAM, so not too many
- * constructs possible here.
- *
- * @return void
- */
-static int beagle_board_init(void)
-{
-	int in_sdram = running_in_sdram();
-
-	if (!in_sdram)
-		omap3_core_init();
-
-	mux_config();
-	/* Dont reconfigure SDRAM while running in SDRAM! */
-	if (!in_sdram)
-		sdrc_init();
-
-	return 0;
-}
-pure_initcall(beagle_board_init);
-
-/******************** Board Run Time *******************/
 
 #ifdef CONFIG_DRIVER_SERIAL_NS16550
-
-static struct NS16550_plat serial_plat = {
-	.clock = 48000000,      /* 48MHz (APLL96/2) */
-	.shift = 2,
-};
 
 /**
  * @brief UART serial port initialization - remember to enable COM clocks in
@@ -247,9 +73,7 @@ static struct NS16550_plat serial_plat = {
  */
 static int beagle_console_init(void)
 {
-	/* Register the serial port */
-	add_ns16550_device(DEVICE_ID_DYNAMIC, OMAP_UART3_BASE, 1024, IORESOURCE_MEM_8BIT,
-			   &serial_plat);
+	omap3_add_uart3();
 
 	return 0;
 }
@@ -286,7 +110,7 @@ static struct gpmc_nand_platform_data nand_plat = {
 
 static int beagle_mem_init(void)
 {
-	arm_add_mem_device("ram0", 0x80000000, 128 * 1024 * 1024);
+	omap_add_ram0(SZ_128M);
 
 	return 0;
 }
@@ -295,13 +119,11 @@ mem_initcall(beagle_mem_init);
 static int beagle_devices_init(void)
 {
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
-	add_generic_device("i2c-omap", DEVICE_ID_DYNAMIC, NULL, OMAP_I2C1_BASE, SZ_4K,
-			   IORESOURCE_MEM, NULL);
+	omap3_add_i2c1(NULL);
 
 #ifdef CONFIG_USB_EHCI_OMAP
 	if (ehci_omap_init(&omap_ehci_pdata) >= 0)
-		add_usb_ehci_device(DEVICE_ID_DYNAMIC, OMAP_EHCI_BASE,
-				    OMAP_EHCI_BASE + 0x10, &ehci_pdata);
+		omap3_add_ehci(&ehci_pdata);
 #endif /* CONFIG_USB_EHCI_OMAP */
 #ifdef CONFIG_OMAP_GPMC
 	/* WP is made high and WAIT1 active Low */
@@ -309,8 +131,7 @@ static int beagle_devices_init(void)
 #endif
 	omap_add_gpmc_nand_device(&nand_plat);
 
-	add_generic_device("omap-hsmmc", DEVICE_ID_DYNAMIC, NULL, OMAP_MMC1_BASE, SZ_4K,
-			   IORESOURCE_MEM, NULL);
+	omap3_add_mmc1(NULL);
 
 	armlinux_set_bootparams((void *)0x80000100);
 	armlinux_set_architecture(MACH_TYPE_OMAP3_BEAGLE);

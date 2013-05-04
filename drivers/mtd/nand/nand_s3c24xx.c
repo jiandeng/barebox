@@ -32,6 +32,7 @@
 #include <mach/s3c24xx-nand.h>
 #include <io.h>
 #include <asm-generic/errno.h>
+#include <asm/sections.h>
 
 #ifdef CONFIG_S3C_NAND_BOOT
 # define __nand_boot_init __bare_init
@@ -469,7 +470,7 @@ static int s3c24x0_nand_probe(struct device_d *dev)
 
 	if (pdata->flash_bbt) {
 		/* use a flash based bbt */
-		chip->options |= NAND_USE_FLASH_BBT;
+		chip->bbt_options |= NAND_BBT_USE_FLASH;
 	}
 
 	ret = s3c24x0_nand_inithw(host);
@@ -483,7 +484,7 @@ static int s3c24x0_nand_probe(struct device_d *dev)
 		goto on_error;
 	}
 
-	return add_mtd_device(mtd, "nand");
+	return add_mtd_nand_device(mtd, "nand");
 
 on_error:
 	free(host);
@@ -494,6 +495,7 @@ static struct driver_d s3c24x0_nand_driver = {
 	.name  = "s3c24x0_nand",
 	.probe = s3c24x0_nand_probe,
 };
+device_platform_driver(s3c24x0_nand_driver);
 
 #ifdef CONFIG_S3C_NAND_BOOT
 
@@ -601,12 +603,12 @@ void __nand_boot_init s3c24x0_nand_load_image(void *dest, int size, int page)
 	disable_nand_controller(host);
 }
 
-#include <asm-generic/sections.h>
+#include <asm/sections.h>
 
 void __nand_boot_init nand_boot(void)
 {
 	void *dest = _text;
-	int size = barebox_image_size;
+	int size = ld_var(_barebox_image_size);
 	int page = 0;
 
 	s3c24x0_nand_load_image(dest, size, page);
@@ -645,17 +647,6 @@ BAREBOX_CMD_END
 #endif
 
 #endif /* CONFIG_S3C_NAND_BOOT */
-
-/*
- * Main initialization routine
- * @return 0 if successful; non-zero otherwise
- */
-static int __init s3c24x0_nand_init(void)
-{
-	return platform_driver_register(&s3c24x0_nand_driver);
-}
-
-device_initcall(s3c24x0_nand_init);
 
 /**
  * @file

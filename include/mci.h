@@ -286,6 +286,7 @@ struct mci_ios {
 /** host information */
 struct mci_host {
 	struct device_d *hw_dev;	/**< the host MCI hardware device */
+	char *devname;			/**< the devicename for the card, defaults to disk%d */
 	unsigned voltages;
 	unsigned host_caps;	/**< Host's interface capabilities, refer MMC_VDD_* */
 	unsigned f_min;		/**< host interface lower limit */
@@ -299,6 +300,10 @@ struct mci_host {
 	void (*set_ios)(struct mci_host*, struct mci_ios *);
 	/** handle a command */
 	int (*send_cmd)(struct mci_host*, struct mci_cmd*, struct mci_data*);
+	/** check if a card is inserted */
+	int (*card_present)(struct mci_host *);
+	/** check if a card is write protected */
+	int (*card_write_protected)(struct mci_host *);
 };
 
 /** MMC/SD and interface instance information */

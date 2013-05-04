@@ -1,11 +1,19 @@
 
+/*
+ * Align to a 32 byte boundary equal to the
+ * alignment gcc 4.5 uses for a struct
+ */
+#define STRUCT_ALIGNMENT 32
+#define STRUCT_ALIGN() . = ALIGN(STRUCT_ALIGNMENT)
+
 #if defined CONFIG_ARCH_IMX25 || \
 	defined CONFIG_ARCH_IMX35 || \
 	defined CONFIG_ARCH_IMX51 || \
 	defined CONFIG_ARCH_IMX53 || \
 	defined CONFIG_ARCH_IMX6 || \
 	defined CONFIG_X86 || \
-	defined CONFIG_ARCH_EP93XX
+	defined CONFIG_ARCH_EP93XX || \
+	defined CONFIG_ARCH_ZYNQ
 #include <mach/barebox.lds.h>
 #endif
 
@@ -32,6 +40,11 @@
 #define BAREBOX_SYMS	KEEP(*(__usymtab))
 
 #define BAREBOX_MAGICVARS	KEEP(*(SORT_BY_NAME(.barebox_magicvar*)))
+
+#define BAREBOX_DTB()				\
+	__dtb_start = .;			\
+	KEEP(*(.dtb.rodata.*));				\
+	__dtb_end = .;
 
 #if defined(CONFIG_ARCH_BAREBOX_MAX_BARE_INIT_SIZE) && \
 CONFIG_ARCH_BAREBOX_MAX_BARE_INIT_SIZE < CONFIG_BAREBOX_MAX_BARE_INIT_SIZE

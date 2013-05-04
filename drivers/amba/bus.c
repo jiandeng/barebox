@@ -104,7 +104,7 @@ int amba_device_add(struct amba_device *dev)
 {
 	u32 size;
 	void __iomem *tmp;
-	int i, ret;
+	int ret;
 	struct resource *res = NULL;
 
 	dev->dev.bus = &amba_bustype;
@@ -135,12 +135,8 @@ int amba_device_add(struct amba_device *dev)
 		 * Read pid and cid based on size of resource
 		 * they are located at end of region
 		 */
-		for (pid = 0, i = 0; i < 4; i++)
-			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
-				(i * 8);
-		for (cid = 0, i = 0; i < 4; i++)
-			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-				(i * 8);
+		pid = amba_device_get_pid(tmp, size);
+		cid = amba_device_get_cid(tmp, size);
 
 		if (cid == AMBA_CID)
 			dev->periphid = pid;
@@ -212,6 +208,7 @@ struct amba_device *amba_device_alloc(const char *name, int id, resource_size_t 
 	dev->res.start = base;
 	dev->res.end = base + size - 1;
 	dev->res.flags = IORESOURCE_MEM;
+	dev->dev.resource = &dev->res;
 
 	return dev;
 }

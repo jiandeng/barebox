@@ -9,7 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/mtd/mtd-abi.h>
 #include <mtd/ubi-user.h>
-#include <ubi-media.h>
+#include <mtd/ubi-media.h>
 
 static int do_ubimkvol(int argc, char *argv[])
 {
@@ -47,7 +47,7 @@ static int do_ubimkvol(int argc, char *argv[])
 static const __maybe_unused char cmd_ubimkvol_help[] =
 "Usage: ubimkvol <ubidev> <name> <size>\n"
 "Create an ubi volume on <ubidev> with name <name> and size <size>\n"
-"If size os zero all available space is used for the volume\n";
+"If size is zero all available space is used for the volume\n";
 
 BAREBOX_CMD_START(ubimkvol)
 	.cmd		= do_ubimkvol,

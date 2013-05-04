@@ -27,7 +27,6 @@
 #include <driver.h>
 #include <linux/clk.h>
 #include <linux/err.h>
-#include <mach/clock.h>
 #include <io.h>
 
 #define DRIVER_NAME "imx-mmc"
@@ -524,12 +523,4 @@ static struct driver_d mxcmci_driver = {
         .name  = DRIVER_NAME,
         .probe = mxcmci_probe,
 };
-
-static int mxcmci_init_driver(void)
-{
-        platform_driver_register(&mxcmci_driver);
-        return 0;
-}
-
-device_initcall(mxcmci_init_driver);
-
+device_platform_driver(mxcmci_driver);

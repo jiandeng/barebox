@@ -31,7 +31,6 @@
 #include <linux/mtd/nand.h>
 #include <mach/board.h>
 #include <mach/at91sam9_smc.h>
-#include <mach/sam9_smc.h>
 #include <gpio.h>
 #include <mach/io.h>
 #include <mach/at91_pmc.h>
@@ -44,7 +43,7 @@
 static struct atmel_nand_data nand_pdata = {
 	.ale		= 21,
 	.cle		= 22,
-	.det_pin	= 0,
+	.det_pin	= -EINVAL,
 	.rdy_pin	= AT91_PIN_PD5,
 	.enable_pin	= AT91_PIN_PD4,
 	.ecc_mode	= NAND_ECC_HW,
@@ -77,7 +76,7 @@ static void ek_add_device_nand(void)
 	ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
 
 	/* configure chip-select 3 (NAND) */
-	sam9_smc_configure(3, &ek_nand_smc_config);
+	sam9_smc_configure(0, 3, &ek_nand_smc_config);
 
 	at91_add_device_nand(&nand_pdata);
 }
@@ -112,7 +111,7 @@ static struct sam9_smc_config __initdata ks8851_smc_config = {
 static void __init ek_add_device_ks8851(void)
 {
 	/* Configure chip-select 2 (KS8851) */
-	sam9_smc_configure(2, &ks8851_smc_config);
+	sam9_smc_configure(0, 2, &ks8851_smc_config);
 	/* Configure NCS signal */
 	at91_set_B_periph(AT91_PIN_PD19, 0);
 	/* Configure Interrupt pin as input, no pull-up */
@@ -125,6 +124,75 @@ static void __init ek_add_device_ks8851(void)
 static void __init ek_add_device_ks8851(void) {}
 #endif /* CONFIG_DRIVER_NET_KS8851_MLL */
 
+#if defined(CONFIG_DRIVER_VIDEO_ATMEL_HLCD)
+static int ek_gpio_request_output(int gpio, const char *name)
+{
+	int ret;
+
+	ret = gpio_request(gpio, name);
+	if (ret) {
+		pr_err("%s: can not request gpio %d (%d)\n", name, gpio, ret);
+		return ret;
+	}
+
+	ret = gpio_direction_output(gpio, 1);
+	if (ret)
+		pr_err("%s: can not configure gpio %d as output (%d)\n", name, gpio, ret);
+	return ret;
+}
+
+
+/*
+ * LCD Controller
+ */
+static struct fb_videomode at91_tft_vga_modes[] = {
+	{
+		.name		= "QD",
+		.refresh	= 60,
+		.xres		= 480,		.yres	= 272,
+		.pixclock	= KHZ2PICOS(9000),
+
+		.left_margin	= 8,		.right_margin	= 43,
+		.upper_margin	= 4,		.lower_margin	= 12,
+		.hsync_len	= 5,		.vsync_len	= 10,
+
+		.sync		= 0,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+};
+
+/* Default output mode is TFT 24 bit */
+#define BPP_OUT_DEFAULT_LCDCFG5	(LCDC_LCDCFG5_MODE_OUTPUT_24BPP)
+
+static void at91_lcdc_power_control(int on)
+{
+	gpio_set_value(AT91_PIN_PC25, !on);
+}
+
+/* Driver datas */
+static struct atmel_lcdfb_platform_data ek_lcdc_data = {
+	.lcdcon_is_backlight		= true,
+	.default_bpp			= 16,
+	.default_dmacon			= ATMEL_LCDC_DMAEN,
+	.default_lcdcon2		= BPP_OUT_DEFAULT_LCDCFG5,
+	.guard_time			= 9,
+	.lcd_wiring_mode		= ATMEL_LCDC_WIRING_RGB,
+	.atmel_lcdfb_power_control	= at91_lcdc_power_control,
+	.mode_list			= at91_tft_vga_modes,
+	.num_modes			= ARRAY_SIZE(at91_tft_vga_modes),
+};
+
+static void ek_add_device_lcdc(void)
+{
+	if (ek_gpio_request_output(AT91_PIN_PC25, "lcdc_power"))
+		return;
+
+	at91_add_device_lcdc(&ek_lcdc_data);
+}
+#else
+static void ek_add_device_lcdc(void) {}
+#endif
+
 /*
  * MCI (SD/MMC)
  */
@@ -132,7 +200,7 @@ static void __init ek_add_device_ks8851(void) {}
 static struct atmel_mci_platform_data mci0_data = {
 	.bus_width	= 4,
 	.detect_pin	= AT91_PIN_PA7,
-	.wp_pin		= 0,
+	.wp_pin		= -EINVAL,
 };
 
 static void ek_add_device_mci(void)
@@ -186,7 +254,7 @@ static void ek_add_device_spi(void)
  */
 static struct at91_udc_data __initdata ek_udc_data = {
 	.vbus_pin	= AT91_PIN_PB16,
-	.pullup_pin	= 0,		/* pull-up driven by UDC */
+	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
 };
 
 struct gpio_led leds[] = {
@@ -229,7 +297,7 @@ static void __init ek_add_device_buttons(void)
 
 static int at91sam9n12ek_mem_init(void)
 {
-	at91_add_device_sdram(128 * 1024 * 1024);
+	at91_add_device_sdram(0);
 
 	return 0;
 }
@@ -245,6 +313,7 @@ static int at91sam9n12ek_devices_init(void)
 	ek_add_device_i2c();
 	ek_add_device_ks8851();
 	ek_add_device_buttons();
+	ek_add_device_lcdc();
 
 	armlinux_set_bootparams((void *)(AT91_CHIPSELECT_1 + 0x100));
 	armlinux_set_architecture(CONFIG_MACH_AT91SAM9N12EK);

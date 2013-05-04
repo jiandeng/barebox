@@ -1,0 +1,47 @@
+menuconfig DRIVER_CFI
+	bool "CFI NOR flash support"
+	help
+	  If you have NOR Flash devices connected to your system and wish
+	  to use them say yes here.
+
+if DRIVER_CFI
+
+config DRIVER_CFI_INTEL
+	default y
+	bool "Support Intel flash chips"
+
+config DRIVER_CFI_AMD
+	default y
+	bool "support AMD flash chips"
+
+config DRIVER_CFI_BANK_WIDTH_1
+	bool "Support 8-bit buswidth"
+	default y
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  8 bits wide, say 'Y'.
+
+config DRIVER_CFI_BANK_WIDTH_2
+	bool "Support 16-bit buswidth"
+	default y
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  16 bits wide, say 'Y'.
+
+config DRIVER_CFI_BANK_WIDTH_4
+	bool "Support 32-bit buswidth"
+	default y
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  32 bits wide, say 'Y'.
+
+config DRIVER_CFI_BANK_WIDTH_8
+	bool "Support 64-bit buswidth"
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  64 bits wide, say 'Y'.
+
+config CFI_BUFFER_WRITE
+	bool "use cfi driver with buffer write"
+
+endif

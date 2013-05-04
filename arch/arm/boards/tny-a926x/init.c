@@ -32,7 +32,6 @@
 #include <mach/board.h>
 #include <mach/at91sam9_smc.h>
 #include <mach/at91sam9_sdramc.h>
-#include <mach/sam9_smc.h>
 #include <gpio.h>
 #include <mach/io.h>
 #include <mach/at91_pmc.h>
@@ -52,7 +51,7 @@ static void tny_a9260_set_board_type(void)
 static struct atmel_nand_data nand_pdata = {
 	.ale		= 21,
 	.cle		= 22,
-	.det_pin	= 0,
+	.det_pin	= -EINVAL,
 	.rdy_pin	= AT91_PIN_PC13,
 	.enable_pin	= AT91_PIN_PC14,
 	.on_flash_bbt	= 1,
@@ -100,9 +99,9 @@ static void tny_a9260_add_device_nand(void)
 {
 	/* configure chip-select 3 (NAND) */
 	if (machine_is_tny_a9g20())
-		sam9_smc_configure(3, &tny_a9g20_nand_smc_config);
+		sam9_smc_configure(0, 3, &tny_a9g20_nand_smc_config);
 	else
-		sam9_smc_configure(3, &tny_a9260_nand_smc_config);
+		sam9_smc_configure(0, 3, &tny_a9260_nand_smc_config);
 
 	if (machine_is_tny_a9263()) {
 		nand_pdata.rdy_pin	= AT91_PIN_PA22;
@@ -113,8 +112,8 @@ static void tny_a9260_add_device_nand(void)
 }
 
 #ifdef CONFIG_DRIVER_NET_MACB
-static struct at91_ether_platform_data macb_pdata = {
-	.is_rmii	= 1,
+static struct macb_platform_data macb_pdata = {
+	.phy_interface	= PHY_INTERFACE_MODE_RMII,
 	.phy_addr	= -1,
 };
 
@@ -132,7 +131,7 @@ static void __init ek_add_device_macb(void) {}
  */
 static struct at91_udc_data __initdata ek_udc_data = {
 	.vbus_pin	= AT91_PIN_PB30,
-	.pullup_pin	= 0,		/* pull-up driven by UDC */
+	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
 };
 
 static struct spi_eeprom eeprom = {
@@ -161,16 +160,31 @@ static struct spi_board_info tny_a9g20_lpw_spi_devices[] = {
 	},
 };
 
-static int spi0_standard_cs[] = { AT91_PIN_PC11 };
-struct at91_spi_platform_data spi0_pdata = {
-	.chipselect = spi0_standard_cs,
-	.num_chipselect = ARRAY_SIZE(spi0_standard_cs),
+static struct spi_board_info tny_a9263_spi_devices[] = {
+	{
+		.name = "mtd_dataflash",
+		.max_speed_hz = 15 * 1000 * 1000,
+		.bus_num = 0,
+		.chip_select = 0,
+	},
 };
 
-static int spi1_standard_cs[] = { AT91_PIN_PC3 };
-struct at91_spi_platform_data spi1_pdata = {
-	.chipselect = spi1_standard_cs,
-	.num_chipselect = ARRAY_SIZE(spi1_standard_cs),
+static int tny_a9263_spi0_standard_cs[] = { AT91_PIN_PA5 };
+struct at91_spi_platform_data tny_a9263_spi0_pdata = {
+	.chipselect = tny_a9263_spi0_standard_cs,
+	.num_chipselect = ARRAY_SIZE(tny_a9263_spi0_standard_cs),
+};
+
+static int tny_a9g20_spi0_standard_cs[] = { AT91_PIN_PC11 };
+struct at91_spi_platform_data tny_a9g20_spi0_pdata = {
+	.chipselect = tny_a9g20_spi0_standard_cs,
+	.num_chipselect = ARRAY_SIZE(tny_a9g20_spi0_standard_cs),
+};
+
+static int tny_a9g20_spi1_standard_cs[] = { AT91_PIN_PC3 };
+struct at91_spi_platform_data tny_a9g20_spi1_pdata = {
+	.chipselect = tny_a9g20_spi1_standard_cs,
+	.num_chipselect = ARRAY_SIZE(tny_a9g20_spi1_standard_cs),
 };
 
 static void __init ek_add_device_udc(void)
@@ -183,17 +197,19 @@ static void __init ek_add_device_udc(void)
 
 static void __init ek_add_device_spi(void)
 {
-	if (machine_is_tny_a9263())
-		return;
+	if (machine_is_tny_a9263()) {
+		spi_register_board_info(tny_a9263_spi_devices,
+			ARRAY_SIZE(tny_a9263_spi_devices));
+		at91_add_device_spi(0, &tny_a9263_spi0_pdata);
 
-	if (machine_is_tny_a9g20() && at91_is_low_power_sdram()) {
+	} else if (machine_is_tny_a9g20() && at91sam9260_is_low_power_sdram()) {
 		spi_register_board_info(tny_a9g20_lpw_spi_devices,
 			ARRAY_SIZE(tny_a9g20_lpw_spi_devices));
-		at91_add_device_spi(1, &spi1_pdata);
+		at91_add_device_spi(1, &tny_a9g20_spi1_pdata);
 	} else {
 		spi_register_board_info(tny_a9g20_spi_devices,
 			ARRAY_SIZE(tny_a9g20_spi_devices));
-		at91_add_device_spi(0, &spi0_pdata);
+		at91_add_device_spi(0, &tny_a9g20_spi0_pdata);
 	}
 }
 

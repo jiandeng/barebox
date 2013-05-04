@@ -14,6 +14,14 @@
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
+/* DBGU base */
+/* rm9200, 9260/9g20, 9261/9g10, 9rl */
+#define AT91_BASE_DBGU0	0xfffff200
+/* 9263, 9g45 */
+#define AT91_BASE_DBGU1	0xffffee00
+
+#define AT91_PMC	0xfffffc00
+
 #if defined(CONFIG_ARCH_AT91RM9200)
 #include <mach/at91rm9200.h>
 #elif defined(CONFIG_ARCH_AT91SAM9260) || defined(CONFIG_ARCH_AT91SAM9G20)
@@ -30,6 +38,8 @@
 #include <mach/at91sam9n12.h>
 #elif defined(CONFIG_ARCH_AT91SAM9X5)
 #include <mach/at91sam9x5.h>
+#elif defined(CONFIG_ARCH_SAMA5D3)
+#include <mach/sama5d3.h>
 #elif defined(CONFIG_ARCH_AT91CAP9)
 #include <mach/at91cap9.h>
 #elif defined(CONFIG_ARCH_AT91X40)
@@ -47,6 +57,12 @@
 #define AT91_CHIPSELECT_5	0x60000000
 #define AT91_CHIPSELECT_6	0x70000000
 #define AT91_CHIPSELECT_7	0x80000000
+
+#define SAMA5_CHIPSELECT_0	0x10000000
+#define SAMA5_DDRCS		0x20000000
+#define SAMA5_CHIPSELECT_1	0x40000000
+#define SAMA5_CHIPSELECT_2	0x50000000
+#define SAMA5_CHIPSELECT_3	0x60000000
 
 /* SDRAM */
 #ifdef CONFIG_DRAM_BASE

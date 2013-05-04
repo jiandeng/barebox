@@ -26,7 +26,7 @@
 void at91_add_device_sdram(u32 size)
 {
 	if (!size)
-		size = at91_get_sdram_size();
+		size = at91sam9263_get_sdram_size(0);
 
 	arm_add_mem_device("ram0", AT91_CHIPSELECT_1, size);
 	add_mem_device("sram0", AT91SAM9263_SRAM0_BASE,
@@ -49,8 +49,9 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
 
 	/* Enable VBus control for UHP ports */
 	for (i = 0; i < data->ports; i++) {
-		if (data->vbus_pin[i])
-			at91_set_gpio_output(data->vbus_pin[i], 0);
+		if (gpio_is_valid(data->vbus_pin[i]))
+			at91_set_gpio_output(data->vbus_pin[i],
+					     data->vbus_pin_active_low[i]);
 	}
 
 	add_generic_device("at91_ohci", DEVICE_ID_DYNAMIC, NULL, AT91SAM9263_UHP_BASE,
@@ -67,7 +68,7 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data) {}
 #ifdef CONFIG_USB_GADGET_DRIVER_AT91
 void __init at91_add_device_udc(struct at91_udc_data *data)
 {
-	if (data->vbus_pin > 0) {
+	if (gpio_is_valid(data->vbus_pin)) {
 		at91_set_gpio_input(data->vbus_pin, 0);
 		at91_set_deglitch(data->vbus_pin, 1);
 	}
@@ -80,7 +81,7 @@ void __init at91_add_device_udc(struct at91_udc_data *data) {}
 #endif
 
 #if defined(CONFIG_DRIVER_NET_MACB)
-void at91_add_device_eth(int id, struct at91_ether_platform_data *data)
+void at91_add_device_eth(int id, struct macb_platform_data *data)
 {
 	if (!data)
 		return;
@@ -96,7 +97,7 @@ void at91_add_device_eth(int id, struct at91_ether_platform_data *data)
 	at91_set_A_periph(AT91_PIN_PE30, 0);	/* EMDIO */
 	at91_set_A_periph(AT91_PIN_PE29, 0);	/* EMDC */
 
-	if (!data->is_rmii) {
+	if (data->phy_interface != PHY_INTERFACE_MODE_RMII) {
 		at91_set_A_periph(AT91_PIN_PE22, 0);	/* ECRS */
 		at91_set_B_periph(AT91_PIN_PC26, 0);	/* ECOL */
 		at91_set_B_periph(AT91_PIN_PC22, 0);	/* ERX2 */
@@ -111,7 +112,7 @@ void at91_add_device_eth(int id, struct at91_ether_platform_data *data)
 			   IORESOURCE_MEM, data);
 }
 #else
-void at91_add_device_eth(int id, struct at91_ether_platform_data *data) {}
+void at91_add_device_eth(int id, struct macb_platform_data *data) {}
 #endif
 
 #if defined(CONFIG_NAND_ATMEL)
@@ -139,15 +140,15 @@ void at91_add_device_nand(struct atmel_nand_data *data)
 	at91_sys_write(AT91_MATRIX_EBI0CSA, csa | AT91_MATRIX_EBI0_CS3A_SMC_SMARTMEDIA);
 
 	/* enable pin */
-	if (data->enable_pin)
+	if (gpio_is_valid(data->enable_pin))
 		at91_set_gpio_output(data->enable_pin, 1);
 
 	/* ready/busy pin */
-	if (data->rdy_pin)
+	if (gpio_is_valid(data->rdy_pin))
 		at91_set_gpio_input(data->rdy_pin, 1);
 
 	/* card detect pin */
-	if (data->det_pin)
+	if (gpio_is_valid(data->det_pin))
 		at91_set_gpio_input(data->det_pin, 1);
 
 	add_generic_device_res("atmel_nand", DEVICE_ID_DYNAMIC, nand_resources,
@@ -222,7 +223,7 @@ void at91_add_device_spi(int spi_id, struct at91_spi_platform_data *pdata)
 		cs_pin = pdata->chipselect[i];
 
 		/* enable chip-select pin */
-		if (cs_pin > 0)
+		if (gpio_is_valid(cs_pin))
 			at91_set_gpio_output(cs_pin, 1);
 	}
 
@@ -247,6 +248,48 @@ void at91_add_device_spi(int spi_id, struct at91_spi_platform_data *pdata)
 }
 #else
 void __init at91_add_device_spi(int spi_id, struct at91_spi_platform_data *pdata) {}
+#endif
+
+
+/* --------------------------------------------------------------------
+ *  LCD Controller
+ * -------------------------------------------------------------------- */
+
+#if defined(CONFIG_DRIVER_VIDEO_ATMEL)
+void __init at91_add_device_lcdc(struct atmel_lcdfb_platform_data *data)
+{
+	BUG_ON(!data);
+
+	data->have_intensity_bit = true;
+
+	at91_set_A_periph(AT91_PIN_PC1, 0);	/* LCDHSYNC */
+	at91_set_A_periph(AT91_PIN_PC2, 0);	/* LCDDOTCK */
+	at91_set_A_periph(AT91_PIN_PC3, 0);	/* LCDDEN */
+	at91_set_B_periph(AT91_PIN_PB9, 0);	/* LCDCC */
+	at91_set_A_periph(AT91_PIN_PC6, 0);	/* LCDD2 */
+	at91_set_A_periph(AT91_PIN_PC7, 0);	/* LCDD3 */
+	at91_set_A_periph(AT91_PIN_PC8, 0);	/* LCDD4 */
+	at91_set_A_periph(AT91_PIN_PC9, 0);	/* LCDD5 */
+	at91_set_A_periph(AT91_PIN_PC10, 0);	/* LCDD6 */
+	at91_set_A_periph(AT91_PIN_PC11, 0);	/* LCDD7 */
+	at91_set_A_periph(AT91_PIN_PC14, 0);	/* LCDD10 */
+	at91_set_A_periph(AT91_PIN_PC15, 0);	/* LCDD11 */
+	at91_set_A_periph(AT91_PIN_PC16, 0);	/* LCDD12 */
+	at91_set_B_periph(AT91_PIN_PC12, 0);	/* LCDD13 */
+	at91_set_A_periph(AT91_PIN_PC18, 0);	/* LCDD14 */
+	at91_set_A_periph(AT91_PIN_PC19, 0);	/* LCDD15 */
+	at91_set_A_periph(AT91_PIN_PC22, 0);	/* LCDD18 */
+	at91_set_A_periph(AT91_PIN_PC23, 0);	/* LCDD19 */
+	at91_set_A_periph(AT91_PIN_PC24, 0);	/* LCDD20 */
+	at91_set_B_periph(AT91_PIN_PC17, 0);	/* LCDD21 */
+	at91_set_A_periph(AT91_PIN_PC26, 0);	/* LCDD22 */
+	at91_set_A_periph(AT91_PIN_PC27, 0);	/* LCDD23 */
+
+	add_generic_device("atmel_lcdfb", DEVICE_ID_SINGLE, NULL, AT91SAM9263_LCDC_BASE, SZ_4K,
+			   IORESOURCE_MEM, data);
+}
+#else
+void __init at91_add_device_lcdc(struct atmel_lcdfb_platform_data *data) {}
 #endif
 
 resource_size_t __init at91_configure_dbgu(void)
@@ -310,12 +353,12 @@ void at91_add_device_mci(short mmc_id, struct atmel_mci_platform_data *data)
 		return;
 
 	/* input/irq */
-	if (data->detect_pin) {
+	if (gpio_is_valid(data->detect_pin)) {
 		at91_set_gpio_input(data->detect_pin, 1);
 		at91_set_deglitch(data->detect_pin, 1);
 	}
 
-	if (data->wp_pin)
+	if (gpio_is_valid(data->wp_pin))
 		at91_set_gpio_input(data->wp_pin, 1);
 
 	if (mmc_id == 0) {		/* MCI0 */

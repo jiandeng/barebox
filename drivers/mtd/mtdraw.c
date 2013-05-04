@@ -98,6 +98,7 @@ static ssize_t mtdraw_read_unaligned(struct mtd_info *mtd, void *dst,
 	if (!tmp)
 		return -ENOMEM;
 	ops.mode = MTD_OOB_RAW;
+	ops.ooboffs = 0;
 	ops.datbuf = tmp;
 	ops.len = mtd->writesize;
 	ops.ooboffs = 0;
@@ -153,6 +154,7 @@ static ssize_t mtdraw_blkwrite(struct mtd_info *mtd, const void *buf,
 	int ret;
 
 	ops.mode = MTD_OOB_RAW;
+	ops.ooboffs = 0;
 	ops.datbuf = (void *)buf;
 	ops.len = mtd->writesize;
 	ops.oobbuf = (void *)buf + mtd->writesize;
@@ -242,11 +244,15 @@ static int mtdraw_erase(struct cdev *cdev, size_t count, loff_t _offset)
 	while (count > 0) {
 		debug("erase %d %d\n", erase.addr, erase.len);
 
-		ret = mtd_block_isbad(mtd, erase.addr);
+		if (!mtd->allow_erasebad)
+			ret = mtd_block_isbad(mtd, erase.addr);
+		else
+			ret = 0;
+
 		if (ret > 0) {
 			printf("Skipping bad block at 0x%08x\n", erase.addr);
 		} else {
-			ret = mtd->erase(mtd, &erase);
+			ret = mtd_erase(mtd, &erase);
 			if (ret)
 				return ret;
 		}

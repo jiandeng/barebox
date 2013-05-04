@@ -40,7 +40,7 @@
 #include <mach/imx5.h>
 
 static struct fec_platform_data fec_info = {
-	.xcv_type = RMII,
+	.xcv_type = PHY_INTERFACE_MODE_RMII,
 };
 
 static iomux_v3_cfg_t tqma53_pads[] = {
@@ -253,8 +253,7 @@ late_initcall(tqma53_part_init);
 static int tqma53_console_init(void)
 {
 	mxc_iomux_v3_setup_multiple_pads(tqma53_pads, ARRAY_SIZE(tqma53_pads));
-	imx53_init_lowlevel(800);
-	imx53_add_uart0();
+	imx53_add_uart1();
 
 	return 0;
 }

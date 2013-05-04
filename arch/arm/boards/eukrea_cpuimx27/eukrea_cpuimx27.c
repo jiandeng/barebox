@@ -26,7 +26,7 @@
 #include <notifier.h>
 #include <mach/gpio.h>
 #include <asm/armlinux.h>
-#include <asm-generic/sections.h>
+#include <asm/sections.h>
 #include <asm/barebox-arm.h>
 #include <generated/mach-types.h>
 #include <partition.h>
@@ -47,7 +47,7 @@
 #include <mach/devices-imx27.h>
 
 static struct fec_platform_data fec_info = {
-	.xcv_type = MII100,
+	.xcv_type = PHY_INTERFACE_MODE_MII,
 	.phy_addr = 1,
 };
 
@@ -230,14 +230,14 @@ console_initcall(eukrea_cpuimx27_console_init);
 
 static int eukrea_cpuimx27_late_init(void)
 {
-#ifdef CONFIG_I2C_LP3972
+#ifdef CONFIG_MFD_LP3972
 	struct i2c_client *client;
 	u8 reg[1];
 #endif
 	console_flush();
 	imx27_add_fec(&fec_info);
 
-#ifdef CONFIG_I2C_LP3972
+#ifdef CONFIG_MFD_LP3972
 	client = lp3972_get_client();
 	if (!client)
 		return -ENODEV;
@@ -248,12 +248,3 @@ static int eukrea_cpuimx27_late_init(void)
 }
 
 late_initcall(eukrea_cpuimx27_late_init);
-
-#ifdef CONFIG_NAND_IMX_BOOT
-void __bare_init nand_boot(void)
-{
-	imx_nand_load_image(_text, barebox_image_size);
-	board_init_lowlevel_return();
-}
-#endif
-

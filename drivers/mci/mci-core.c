@@ -430,8 +430,10 @@ static int mmc_change_freq(struct mci *mci)
 	}
 
 	/* No high-speed support */
-	if (!mci->ext_csd[EXT_CSD_HS_TIMING])
+	if (!mci->ext_csd[EXT_CSD_HS_TIMING]) {
+		dev_dbg(mci->mci_dev, "No high-speed support\n");
 		return 0;
+	}
 
 	/* High Speed is set, there are two types: 52MHz and 26MHz */
 	if (cardtype & EXT_CSD_CARD_TYPE_52)
@@ -669,7 +671,8 @@ static void mci_detect_version_from_csd(struct mci *mci)
 			mci->version = MMC_VERSION_1_2;
 			break;
 		}
-		printf("detected card version %s\n", vstr);
+
+		dev_info(mci->mci_dev, "detected card version %s\n", vstr);
 	}
 }
 
@@ -891,8 +894,9 @@ static int mci_startup_mmc(struct mci *mci)
 			mci_set_clock(mci, 52000000);
 		else
 			mci_set_clock(mci, 26000000);
-	} else
+	} else {
 		mci_set_clock(mci, 20000000);
+	}
 
 	/*
 	 * Unlike SD, MMC cards dont have a configuration register to notify
@@ -1111,7 +1115,13 @@ static int __maybe_unused mci_sd_write(struct block_device *blk,
 				const void *buffer, int block, int num_blocks)
 {
 	struct mci *mci = container_of(blk, struct mci, blk);
+	struct mci_host *host = mci->host;
 	int rc;
+
+	if (host->card_write_protected && host->card_write_protected(host)) {
+		dev_err(mci->mci_dev, "card write protected\n");
+		return -EPERM;
+	}
 
 	dev_dbg(mci->mci_dev, "%s: Write %d block(s), starting at %d\n",
 		__func__, num_blocks, block);
@@ -1163,7 +1173,7 @@ static int mci_sd_read(struct block_device *blk, void *buffer, int block,
 	}
 
 	if (block > MAX_BUFFER_NUMBER) {
-		pr_err("Cannot handle block number %d. Too large!\n", block);
+		dev_err(mci->mci_dev, "Cannot handle block number %d. Too large!\n", block);
 		return -EINVAL;
 	}
 
@@ -1352,10 +1362,15 @@ static int mci_card_probe(struct mci *mci)
 	struct mci_host *host = mci->host;
 	int rc, disknum;
 
+	if (host->card_present && !host->card_present(host)) {
+		dev_err(mci->mci_dev, "no card inserted\n");
+		return -ENODEV;
+	}
+
 	/* start with a host interface reset */
 	rc = (host->init)(host, mci->mci_dev);
 	if (rc) {
-		pr_err("Cannot reset the SD/MMC interface\n");
+		dev_err(mci->mci_dev, "Cannot reset the SD/MMC interface\n");
 		return rc;
 	}
 
@@ -1365,7 +1380,7 @@ static int mci_card_probe(struct mci *mci)
 	/* reset the card */
 	rc = mci_go_idle(mci);
 	if (rc) {
-		pr_warning("Cannot reset the SD/MMC card\n");
+		dev_warn(mci->mci_dev, "Cannot reset the SD/MMC card\n");
 		goto on_error;
 	}
 
@@ -1397,9 +1412,13 @@ static int mci_card_probe(struct mci *mci)
 	mci->blk.dev = mci->mci_dev;
 	mci->blk.ops = &mci_ops;
 
-	disknum = cdev_find_free_index("disk");
+	if (host->devname) {
+		mci->blk.cdev.name = strdup(host->devname);
+	} else {
+		disknum = cdev_find_free_index("disk");
+		mci->blk.cdev.name = asprintf("disk%d", disknum);
+	}
 
-	mci->blk.cdev.name = asprintf("disk%d", disknum);
 	mci->blk.blockbits = SECTOR_SHIFT;
 	mci->blk.num_blocks = mci_calc_blk_cnt(mci->capacity, mci->blk.blockbits);
 
@@ -1409,7 +1428,7 @@ static int mci_card_probe(struct mci *mci)
 		goto on_error;
 	}
 
-	dev_info(mci->mci_dev, "registered disk%d\n", disknum);
+	dev_info(mci->mci_dev, "registered %s\n", mci->blk.cdev.name);
 
 	/* create partitions on demand */
 	rc = parse_partition_table(&mci->blk);
@@ -1444,7 +1463,10 @@ static int mci_set_probe(struct device_d *mci_dev, struct param_d *param,
 
 	rc = mci_check_if_already_initialized(mci);
 	if (rc != 0)
-		return rc;
+		return 0;
+
+	if (!val)
+		return -EINVAL;
 
 	probe = simple_strtoul(val, NULL, 0);
 	if (probe != 0) {
@@ -1495,34 +1517,18 @@ static int mci_probe(struct device_d *mci_dev)
 
 	dev_info(mci->host->hw_dev, "registered as %s\n", dev_name(mci_dev));
 
-#ifdef CONFIG_MCI_STARTUP
-	/* if enabled, probe the attached card immediately */
-	rc = mci_card_probe(mci);
-	if (rc) {
-		/*
-		 * If it fails, add the 'probe' parameter to give the user
-		 * a chance to insert a card and try again. Note: This may fail
-		 * systems that rely on the MCI card for startup (for the
-		 * persistant environment for example)
-		 */
-		rc = add_mci_parameter(mci_dev);
-		if (rc != 0) {
-			dev_dbg(mci->mci_dev, "Failed to add 'probe' parameter to the MCI device\n");
-			goto on_error;
-		}
-	}
-#endif
-
-#ifndef CONFIG_MCI_STARTUP
-	/* add params on demand */
 	rc = add_mci_parameter(mci_dev);
 	if (rc != 0) {
 		dev_dbg(mci->mci_dev, "Failed to add 'probe' parameter to the MCI device\n");
 		goto on_error;
 	}
+
+#ifdef CONFIG_MCI_STARTUP
+	/* if enabled, probe the attached card immediately */
+	mci_card_probe(mci);
 #endif
 
-	return rc;
+	return 0;
 
 on_error:
 	free(mci);

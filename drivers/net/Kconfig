@@ -27,9 +27,17 @@ menu "Network drivers"
 
 source "drivers/net/phy/Kconfig"
 
+config DRIVER_NET_CALXEDA_XGMAC
+	bool "Calxeda xgmac"
+
 config DRIVER_NET_CS8900
 	bool "cs8900 ethernet driver"
 	depends on HAS_CS8900
+
+config DRIVER_NET_CPSW
+	bool "CPSW ethernet driver"
+	depends on ARCH_OMAP
+	select PHYLIB
 
 config DRIVER_NET_SMC911X
 	bool "smc911x ethernet driver"

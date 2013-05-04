@@ -533,6 +533,7 @@ static int imx_spi_probe(struct device_d *dev)
 
 	master = &imx->master;
 	master->dev = dev;
+	master->bus_num = dev->id;
 
 	master->setup = imx_spi_setup;
 	master->transfer = imx_spi_transfer;
@@ -597,12 +598,4 @@ static struct driver_d imx_spi_driver = {
 	.probe = imx_spi_probe,
 	.of_compatible = DRV_OF_COMPAT(imx_spi_dt_ids),
 };
-
-static int imx_spi_init(void)
-{
-	platform_driver_register(&imx_spi_driver);
-	return 0;
-}
-
-device_initcall(imx_spi_init);
-
+device_platform_driver(imx_spi_driver);

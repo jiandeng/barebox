@@ -67,6 +67,24 @@
 #define MACB_TPQ				0x00bc
 #define MACB_USRIO				0x00c0
 #define MACB_WOL				0x00c4
+#define MACB_MID				0x00fc
+
+/* GEM register offsets. */
+#define GEM_NCFGR				0x0004
+#define GEM_USRIO				0x000c
+#define GEM_DMACFG				0x0010
+#define GEM_HRB					0x0080
+#define GEM_HRT					0x0084
+#define GEM_SA1B				0x0088
+#define GEM_SA1T				0x008C
+#define GEM_OTX					0x0100
+#define GEM_DCFG1				0x0280
+#define GEM_DCFG2				0x0284
+#define GEM_DCFG3				0x0288
+#define GEM_DCFG4				0x028c
+#define GEM_DCFG5				0x0290
+#define GEM_DCFG6				0x0294
+#define GEM_DCFG7				0x0298
 
 /* Bitfields in NCR */
 #define MACB_LB_OFFSET				0
@@ -133,6 +151,36 @@
 #define MACB_EFRHD_SIZE				1
 #define MACB_IRXFCS_OFFSET			19
 #define MACB_IRXFCS_SIZE			1
+
+/* GEM specific NCFGR bitfields. */
+#define GEM_GBE_OFFSET				10
+#define GEM_GBE_SIZE				1
+#define GEM_CLK_OFFSET				18
+#define GEM_CLK_SIZE				3
+#define GEM_DBW_OFFSET				21
+#define GEM_DBW_SIZE				2
+
+/* Constants for data bus width. */
+#define GEM_DBW32				0
+#define GEM_DBW64				1
+#define GEM_DBW128				2
+
+/* Bitfields in DMACFG. */
+#define GEM_FBLDO_OFFSET			0
+#define GEM_FBLDO_SIZE				5
+#define GEM_ENDIA_OFFSET			7
+#define GEM_ENDIA_SIZE				1
+#define GEM_RXBMS_OFFSET			8
+#define GEM_RXBMS_SIZE				2
+#define GEM_TXPBMS_OFFSET			10
+#define GEM_TXPBMS_SIZE				1
+#define GEM_TXCOEN_OFFSET			11
+#define GEM_TXCOEN_SIZE				1
+#define GEM_RXBS_OFFSET				16
+#define GEM_RXBS_SIZE				8
+#define GEM_DDRP_OFFSET				24
+#define GEM_DDRP_SIZE				1
+
 
 /* Bitfields in NSR */
 #define MACB_NSR_LINK_OFFSET			0
@@ -208,7 +256,7 @@
 #define MACB_SOF_OFFSET				30
 #define MACB_SOF_SIZE				2
 
-/* Bitfields in USRIO */
+/* Bitfields in USRIO (AVR32) */
 #define MACB_MII_OFFSET				0
 #define MACB_MII_SIZE				1
 #define MACB_EAM_OFFSET				1
@@ -221,6 +269,8 @@
 /* Bitfields in USRIO (AT91) */
 #define MACB_RMII_OFFSET			0
 #define MACB_RMII_SIZE				1
+#define GEM_RGMII_OFFSET			0	/* GEM gigabit mode */
+#define GEM_RGMII_SIZE				1
 #define MACB_CLKEN_OFFSET			1
 #define MACB_CLKEN_SIZE				1
 
@@ -236,11 +286,29 @@
 #define MACB_WOL_MTI_OFFSET			19
 #define MACB_WOL_MTI_SIZE			1
 
+/* Bitfields in MID */
+#define MACB_IDNUM_OFFSET			16
+#define MACB_IDNUM_SIZE				16
+#define MACB_REV_OFFSET				0
+#define MACB_REV_SIZE				16
+
+/* Bitfields in DCFG1. */
+#define GEM_DBWDEF_OFFSET			25
+#define GEM_DBWDEF_SIZE				3
+
 /* Constants for CLK */
 #define MACB_CLK_DIV8				0
 #define MACB_CLK_DIV16				1
 #define MACB_CLK_DIV32				2
 #define MACB_CLK_DIV64				3
+
+/* GEM specific constants for CLK. */
+#define GEM_CLK_DIV8				0
+#define GEM_CLK_DIV16				1
+#define GEM_CLK_DIV32				2
+#define GEM_CLK_DIV48				3
+#define GEM_CLK_DIV64				4
+#define GEM_CLK_DIV96				5
 
 /* Constants for MAN register */
 #define MACB_MAN_SOF				1
@@ -261,5 +329,122 @@
 	(((old) & ~(((1 << MACB_##name##_SIZE) - 1)	\
 		    << MACB_##name##_OFFSET))		\
 	 | MACB_BF(name,value))
+
+#define GEM_BIT(name)					\
+	(1 << GEM_##name##_OFFSET)
+#define GEM_BF(name, value)				\
+	(((value) & ((1 << GEM_##name##_SIZE) - 1))	\
+	 << GEM_##name##_OFFSET)
+#define GEM_BFEXT(name, value)\
+	(((value) >> GEM_##name##_OFFSET)		\
+	 & ((1 << GEM_##name##_SIZE) - 1))
+#define GEM_BFINS(name, value, old)			\
+	(((old) & ~(((1 << GEM_##name##_SIZE) - 1)	\
+		    << GEM_##name##_OFFSET))		\
+	 | GEM_BF(name, value))
+
+/* Register access macros */
+#define macb_readl(port,reg)				\
+	__raw_readl((port)->regs + MACB_##reg)
+#define macb_writel(port,reg,value)			\
+	__raw_writel((value), (port)->regs + MACB_##reg)
+#define gem_readl(port, reg)				\
+	__raw_readl((port)->regs + GEM_##reg)
+#define gem_writel(port, reg, value)			\
+	__raw_writel((value), (port)->regs + GEM_##reg)
+
+/*
+ * Conditional GEM/MACB macros.  These perform the operation to the correct
+ * register dependent on whether the device is a GEM or a MACB.  For registers
+ * and bitfields that are common across both devices, use macb_{read,write}l
+ * to avoid the cost of the conditional.
+ */
+#define macb_or_gem_writel(__bp, __reg, __value) \
+	({ \
+		if (macb_is_gem((__bp))) \
+			gem_writel((__bp), __reg, __value); \
+		else \
+			macb_writel((__bp), __reg, __value); \
+	})
+
+#define macb_or_gem_readl(__bp, __reg) \
+	({ \
+		u32 __v; \
+		if (macb_is_gem((__bp))) \
+			__v = gem_readl((__bp), __reg); \
+		else \
+			__v = macb_readl((__bp), __reg); \
+		__v; \
+	})
+
+/**
+ * struct macb_dma_desc - Hardware DMA descriptor
+ * @addr: DMA address of data buffer
+ * @ctrl: Control and status bits
+ */
+struct macb_dma_desc {
+	u32	addr;
+	u32	ctrl;
+};
+
+/* DMA descriptor bitfields */
+#define MACB_RX_USED_OFFSET			0
+#define MACB_RX_USED_SIZE			1
+#define MACB_RX_WRAP_OFFSET			1
+#define MACB_RX_WRAP_SIZE			1
+#define MACB_RX_WADDR_OFFSET			2
+#define MACB_RX_WADDR_SIZE			30
+
+#define MACB_RX_FRMLEN_OFFSET			0
+#define MACB_RX_FRMLEN_SIZE			12
+#define MACB_RX_OFFSET_OFFSET			12
+#define MACB_RX_OFFSET_SIZE			2
+#define MACB_RX_SOF_OFFSET			14
+#define MACB_RX_SOF_SIZE			1
+#define MACB_RX_EOF_OFFSET			15
+#define MACB_RX_EOF_SIZE			1
+#define MACB_RX_CFI_OFFSET			16
+#define MACB_RX_CFI_SIZE			1
+#define MACB_RX_VLAN_PRI_OFFSET			17
+#define MACB_RX_VLAN_PRI_SIZE			3
+#define MACB_RX_PRI_TAG_OFFSET			20
+#define MACB_RX_PRI_TAG_SIZE			1
+#define MACB_RX_VLAN_TAG_OFFSET			21
+#define MACB_RX_VLAN_TAG_SIZE			1
+#define MACB_RX_TYPEID_MATCH_OFFSET		22
+#define MACB_RX_TYPEID_MATCH_SIZE		1
+#define MACB_RX_SA4_MATCH_OFFSET		23
+#define MACB_RX_SA4_MATCH_SIZE			1
+#define MACB_RX_SA3_MATCH_OFFSET		24
+#define MACB_RX_SA3_MATCH_SIZE			1
+#define MACB_RX_SA2_MATCH_OFFSET		25
+#define MACB_RX_SA2_MATCH_SIZE			1
+#define MACB_RX_SA1_MATCH_OFFSET		26
+#define MACB_RX_SA1_MATCH_SIZE			1
+#define MACB_RX_EXT_MATCH_OFFSET		28
+#define MACB_RX_EXT_MATCH_SIZE			1
+#define MACB_RX_UHASH_MATCH_OFFSET		29
+#define MACB_RX_UHASH_MATCH_SIZE		1
+#define MACB_RX_MHASH_MATCH_OFFSET		30
+#define MACB_RX_MHASH_MATCH_SIZE		1
+#define MACB_RX_BROADCAST_OFFSET		31
+#define MACB_RX_BROADCAST_SIZE			1
+
+#define MACB_TX_FRMLEN_OFFSET			0
+#define MACB_TX_FRMLEN_SIZE			11
+#define MACB_TX_LAST_OFFSET			15
+#define MACB_TX_LAST_SIZE			1
+#define MACB_TX_NOCRC_OFFSET			16
+#define MACB_TX_NOCRC_SIZE			1
+#define MACB_TX_BUF_EXHAUSTED_OFFSET		27
+#define MACB_TX_BUF_EXHAUSTED_SIZE		1
+#define MACB_TX_UNDERRUN_OFFSET			28
+#define MACB_TX_UNDERRUN_SIZE			1
+#define MACB_TX_ERROR_OFFSET			29
+#define MACB_TX_ERROR_SIZE			1
+#define MACB_TX_WRAP_OFFSET			30
+#define MACB_TX_WRAP_SIZE			1
+#define MACB_TX_USED_OFFSET			31
+#define MACB_TX_USED_SIZE			1
 
 #endif /* __DRIVERS_MACB_H__ */

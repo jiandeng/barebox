@@ -14,16 +14,17 @@
  */
 
 #include <config.h>
+#include <sizes.h>
 #include <asm-generic/memory_layout.h>
 #include <mach/imx21-regs.h>
 #include <asm/barebox-arm-head.h>
 
 	.section ".text_bare_init","ax"
 
-.globl reset
-reset:
+.globl barebox_arm_reset_vector
+barebox_arm_reset_vector:
 
-	common_reset r0
+	arm_cpu_lowlevel_init r0
 
 /*
  * Initialize the AHB-Lite IP Interface (AIPI) module (to enable access to
@@ -75,7 +76,7 @@ reset:
 	cmp	pc, #0xc8000000
 	bhi	1f
 
-	b	board_init_lowlevel_return
+	b	ret
 1:
 
 	/* Precharge */
@@ -118,34 +119,17 @@ reset:
 	str	r1, [r0]
 
 #ifdef CONFIG_NAND_IMX_BOOT
-	ldr	sp, =STACK_BASE + STACK_SIZE - 12	/* Setup a temporary stack in SDRAM */
+	/* Setup a temporary stack in SRAM */
+	ldr	sp, =MX21_IRAM_BASE_ADDR + MX21_IRAM_SIZE - 4
 
-	ldr	r0, =MX21_NFC_BASE_ADDR		/* start of NFC SRAM        */
-	ldr	r2, =MX21_NFC_BASE_ADDR + 0x800	/* end of NFC SRAM          */
-
-	/* skip NAND boot if not running from NFC space */
-	cmp	pc, r0
-	bls	ret
-	cmp	pc, r2
-	bhi	ret
-
-	/* Move ourselves out of NFC SRAM */
-	ldr	r1, =_text
-
-copy_loop:
-	ldmia	r0!, {r3-r9}		/* copy from source address [r0]    */
-	stmia	r1!, {r3-r9}		/* copy to   target address [r1]    */
-	cmp	r0, r2			/* until source end address [r2]    */
-	ble	copy_loop
-
-	ldr	pc, =1f			/* Jump to SDRAM                    */
-1:
-	b	nand_boot		/* Load barebox from NAND Flash     */
-					/* SRAM to SDRAM                    */
+	b	imx21_barebox_boot_nand_external
 #endif /* CONFIG_NAND_IMX_BOOT */
 
 ret:
-	b	board_init_lowlevel_return
+	mov	r0, #0xc0000000
+	mov	r1, #SZ_64M
+	mov	r2, #0
+	b	barebox_arm_entry
 
 /*
  *  spin for a while.  we need to wait at least 200 usecs.

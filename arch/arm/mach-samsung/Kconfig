@@ -40,7 +40,6 @@ choice
 config MACH_A9M2410
 	bool "Digi A9M2410"
 	select CPU_S3C2410
-	select MACH_HAS_LOWLEVEL_INIT
 	select S3C_PLL_INIT
 	select S3C_SDRAM_INIT
 	help
@@ -50,7 +49,6 @@ config MACH_A9M2410
 config MACH_A9M2440
 	bool "Digi A9M2440"
 	select CPU_S3C2440
-	select MACH_HAS_LOWLEVEL_INIT
 	select S3C_PLL_INIT
 	help
 	  Say Y here if you are using Digi's Connect Core 9M equipped
@@ -59,8 +57,6 @@ config MACH_A9M2440
 config MACH_MINI2440
 	bool "Mini 2440"
 	select CPU_S3C2440
-	select MACH_HAS_LOWLEVEL_INIT
-	select MACH_DO_LOWLEVEL_INIT
 	select S3C_PLL_INIT
 	select S3C_SDRAM_INIT
 	select HAS_DM9000
@@ -138,7 +134,6 @@ choice
 config MACH_TINY210
 	bool "Tiny 210"
 	select CPU_S5PV210
-	select MACH_HAS_LOWLEVEL_INIT
 	select HAS_DM9000
 
 endchoice
@@ -154,7 +149,6 @@ config S3C_PLL_INIT
 	bool
 	default y
 	prompt "Reconfigure PLL"
-	depends on MACH_DO_LOWLEVEL_INIT
 	select S3C_LOWLEVEL_INIT
 	help
 	  This adds generic code to reconfigure the internal PLL very early
@@ -164,7 +158,6 @@ config S3C_SDRAM_INIT
 	bool
 	default y
 	prompt "Initialize SDRAM"
-	depends on MACH_DO_LOWLEVEL_INIT
 	select S3C_LOWLEVEL_INIT
 	help
 	  This adds generic code to configure the SDRAM controller after reset.

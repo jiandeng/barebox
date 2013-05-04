@@ -33,7 +33,7 @@
 #include <mach/gpio.h>
 #include <mach/io.h>
 
-static struct at91_ether_platform_data macb_pdata = {
+static struct macb_platform_data macb_pdata = {
 	.phy_flags	= PHYLIB_FORCE_LINK,
 	.phy_addr	= 4,
 };
@@ -54,7 +54,7 @@ static int mmccpu_devices_init(void)
 	 * 0 - disable
 	 */
 	at91_set_gpio_output(AT91_PIN_PB27, 1);
-	at91_set_gpio_value(AT91_PIN_PB27, 1); /* 1- enable, 0 - disable */
+	gpio_set_value(AT91_PIN_PB27, 1); /* 1- enable, 0 - disable */
 
 	at91_add_device_eth(0, &macb_pdata);
 	add_cfi_flash_device(0, AT91_CHIPSELECT_0, 0, 0);

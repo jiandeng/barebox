@@ -1,5 +1,5 @@
-VERSION = 2012
-PATCHLEVEL = 12
+VERSION = 2013
+PATCHLEVEL = 04
 SUBLEVEL = 0
 EXTRAVERSION =
 NAME = Amissive Actinocutious Kiwi
@@ -481,7 +481,7 @@ export KBUILD_BINARY ?= barebox.bin
 barebox-flash-image: $(KBUILD_IMAGE) FORCE
 	$(call if_changed,ln)
 
-all: barebox-flash-image
+all: barebox-flash-image $(KBUILD_DTBS)
 
 common-$(CONFIG_PBL_IMAGE)	+= pbl/
 
@@ -546,17 +546,6 @@ quiet_cmd_barebox_version = GEN     .version
 	  expr 0$$(cat .old_version) + 1 >.version;	\
 	fi;						\
 	$(MAKE) $(build)=common
-
-# Check size of a file
-quiet_cmd_check_file_size = CHKSIZE $@
-      cmd_check_file_size = set -e;					\
-	size=`stat -c%s $@`;						\
-	max_size=`printf "%d" $2`;					\
-	if [ $$size -gt $$max_size ] ;					\
-	then								\
-		echo "$@ size $$size > of the maximum size $$max_size" >&2;	\
-		exit 1 ;						\
-	fi;
 
 # Generate System.map
 quiet_cmd_sysmap = SYSMAP
@@ -755,68 +744,11 @@ PHONY += $(barebox-dirs)
 $(barebox-dirs): prepare scripts
 	$(Q)$(MAKE) $(build)=$@
 
-# Build the kernel release string
-#
-# The KERNELRELEASE value built here is stored in the file
-# include/config/kernel.release, and is used when executing several
-# make targets, such as "make install" or "make modules_install."
-#
-# The eventual kernel release string consists of the following fields,
-# shown in a hierarchical format to show how smaller parts are concatenated
-# to form the larger and final value, with values coming from places like
-# the Makefile, kernel config options, make command line options and/or
-# SCM tag information.
-#
-#	$(KERNELVERSION)
-#	  $(VERSION)			eg, 2
-#	  $(PATCHLEVEL)			eg, 6
-#	  $(SUBLEVEL)			eg, 18
-#	  $(EXTRAVERSION)		eg, -rc6
-#	$(localver-full)
-#	  $(localver)
-#	    localversion*		(all localversion* files)
-#	    $(CONFIG_LOCALVERSION)	(from kernel config setting)
-#	  $(localver-auto)		(only if CONFIG_LOCALVERSION_AUTO is set)
-#	    ./scripts/setlocalversion	(SCM tag, if one exists)
-#	    $(LOCALVERSION)		(from make command line if provided)
-#
-#  Note how the final $(localver-auto) string is included *only* if the
-# kernel config option CONFIG_LOCALVERSION_AUTO is selected.  Also, at the
-# moment, only git is supported but other SCMs can edit the script
-# scripts/setlocalversion and add the appropriate checks as needed.
-
-nullstring :=
-space      := $(nullstring) # end of line
-
-___localver = $(objtree)/localversion* $(srctree)/localversion*
-__localver  = $(sort $(wildcard $(___localver)))
-# skip backup files (containing '~')
-_localver = $(foreach f, $(__localver), $(if $(findstring ~, $(f)),,$(f)))
-
-localver = $(subst $(space),, \
-	   $(shell cat /dev/null $(_localver)) \
-	   $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
-
-# If CONFIG_LOCALVERSION_AUTO is set scripts/setlocalversion is called
-# and if the SCM is know a tag from the SCM is appended.
-# The appended tag is determined by the SCM used.
-#
-# Currently, only git is supported.
-# Other SCMs can edit scripts/setlocalversion and add the appropriate
-# checks as needed.
-ifdef CONFIG_LOCALVERSION_AUTO
-	_localver-auto = $(shell $(CONFIG_SHELL) \
-	                  $(srctree)/scripts/setlocalversion $(srctree))
-	localver-auto  = $(LOCALVERSION)$(_localver-auto)
-endif
-
-localver-full = $(localver)$(localver-auto)
-
 # Store (new) KERNELRELASE string in include/config/kernel.release
-kernelrelease = $(KERNELVERSION)$(localver-full)
+localversion = $(shell $(srctree)/scripts/setlocalversion $(srctree))
 include/config/kernel.release: include/config/auto.conf FORCE
 	$(Q)rm -f $@
-	$(Q)echo $(kernelrelease) > $@
+	$(Q)echo $(KERNELVERSION)$(localversion) > $@
 
 Doxyfile.version: include/config/auto.conf FORCE
 	$(Q)rm -f $@

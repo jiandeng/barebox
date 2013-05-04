@@ -55,6 +55,7 @@ machine-$(CONFIG_ARCH_AT91)		:= at91
 machine-$(CONFIG_ARCH_BCM2835)		:= bcm2835
 machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
 machine-$(CONFIG_ARCH_EP93XX)		:= ep93xx
+machine-$(CONFIG_ARCH_HIGHBANK)		:= highbank
 machine-$(CONFIG_ARCH_IMX)		:= imx
 machine-$(CONFIG_ARCH_MXS)		:= mxs
 machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
@@ -63,12 +64,15 @@ machine-$(CONFIG_ARCH_OMAP)		:= omap
 machine-$(CONFIG_ARCH_PXA)		:= pxa
 machine-$(CONFIG_ARCH_SAMSUNG)		:= samsung
 machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
+machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
 machine-$(CONFIG_ARCH_TEGRA)		:= tegra
+machine-$(CONFIG_ARCH_ZYNQ)		:= zynq
 
 # Board directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
 board-$(CONFIG_MACH_A9M2410)			:= a9m2410
 board-$(CONFIG_MACH_A9M2440)			:= a9m2440
+board-$(CONFIG_MACH_ANIMEO_IP)			:= animeo_ip
 board-$(CONFIG_MACH_AT91RM9200EK)		:= at91rm9200ek
 board-$(CONFIG_MACH_AT91SAM9260EK)		:= at91sam9260ek
 board-$(CONFIG_MACH_AT91SAM9261EK)		:= at91sam9261ek
@@ -77,7 +81,9 @@ board-$(CONFIG_MACH_AT91SAM9G10EK)		:= at91sam9261ek
 board-$(CONFIG_MACH_AT91SAM9G20EK)		:= at91sam9260ek
 board-$(CONFIG_MACH_AT91SAM9N12EK)		:= at91sam9n12ek
 board-$(CONFIG_MACH_AT91SAM9X5EK)		:= at91sam9x5ek
+board-$(CONFIG_MACH_AT91SAM9M10IHD)		:= at91sam9m10ihd
 board-$(CONFIG_MACH_AT91SAM9M10G45EK)		:= at91sam9m10g45ek
+board-$(CONFIG_MACH_SAMA5D3XEK)			:= sama5d3xek
 board-$(CONFIG_MACH_CLEP7212)			:= clep7212
 board-$(CONFIG_MACH_DSS11)			:= dss11
 board-$(CONFIG_MACH_EDB9301)			:= edb93xx
@@ -94,6 +100,8 @@ board-$(CONFIG_MACH_EUKREA_CPUIMX35)		:= eukrea_cpuimx35
 board-$(CONFIG_MACH_EUKREA_CPUIMX51SD)		:= eukrea_cpuimx51
 board-$(CONFIG_MACH_FREESCALE_MX25_3STACK)	:= freescale-mx25-3-stack
 board-$(CONFIG_MACH_FREESCALE_MX35_3STACK)	:= freescale-mx35-3-stack
+board-$(CONFIG_MACH_GE863)			:= telit-evk-pro3
+board-$(CONFIG_MACH_HIGHBANK)			:= highbank
 board-$(CONFIG_MACH_IMX21ADS)			:= imx21ads
 board-$(CONFIG_MACH_IMX27ADS)			:= imx27ads
 board-$(CONFIG_MACH_IMX233_OLINUXINO)	:= imx233-olinuxino
@@ -103,6 +111,7 @@ board-$(CONFIG_MACH_NOMADIK_8815NHK)		:= nhk8815
 board-$(CONFIG_MACH_NXDB500)			:= netx
 board-$(CONFIG_MACH_OMAP343xSDP)		:= omap343xdsp
 board-$(CONFIG_MACH_BEAGLE)			:= beagle
+board-$(CONFIG_MACH_BEAGLEBONE)			:= beaglebone
 board-$(CONFIG_MACH_OMAP3EVM)			:= omap3evm
 board-$(CONFIG_MACH_PANDA)			:= panda
 board-$(CONFIG_MACH_ARCHOSG9)			:= archosg9
@@ -114,6 +123,7 @@ board-$(CONFIG_MACH_PCM027)			:= pcm027
 board-$(CONFIG_MACH_PCM037)			:= pcm037
 board-$(CONFIG_MACH_PCM038)			:= pcm038
 board-$(CONFIG_MACH_PCM043)			:= pcm043
+board-$(CONFIG_MACH_PCM051)			:= pcm051
 board-$(CONFIG_MACH_PM9261)			:= pm9261
 board-$(CONFIG_MACH_PM9263)			:= pm9263
 board-$(CONFIG_MACH_PM9G45)			:= pm9g45
@@ -140,6 +150,7 @@ board-$(CONFIG_MACH_USB_A9260)			:= usb-a926x
 board-$(CONFIG_MACH_USB_A9263)			:= usb-a926x
 board-$(CONFIG_MACH_USB_A9G20)			:= usb-a926x
 board-$(CONFIG_MACH_VERSATILEPB)		:= versatile
+board-$(CONFIG_MACH_VEXPRESS)			:= vexpress
 board-$(CONFIG_MACH_TX25)			:= karo-tx25
 board-$(CONFIG_MACH_TQMA53)			:= tqma53
 board-$(CONFIG_MACH_TX51)			:= karo-tx51
@@ -150,6 +161,10 @@ board-$(CONFIG_MACH_TINY210)			:= friendlyarm-tiny210
 board-$(CONFIG_MACH_SABRELITE)			:= freescale-mx6-sabrelite
 board-$(CONFIG_MACH_TX53)			:= karo-tx53
 board-$(CONFIG_MACH_GUF_VINCELL)		:= guf-vincell
+board-$(CONFIG_MACH_EFIKA_MX_SMARTBOOK)		:= efika-mx-smartbook
+board-$(CONFIG_MACH_SABRESD)			:= freescale-mx6-sabresd
+board-$(CONFIG_MACH_REALQ7)			:= dmo-mx6-realq7
+board-$(CONFIG_MACH_ZEDBOARD)			:= avnet-zedboard
 
 machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
 
@@ -167,6 +182,10 @@ ifndef CONFIG_MODULES
 # Add cleanup flags
 CPPFLAGS += -fdata-sections -ffunction-sections
 LDFLAGS_barebox += -static --gc-sections
+endif
+
+ifdef CONFIG_RELOCATABLE
+LDFLAGS_barebox += -pie
 endif
 
 ifdef CONFIG_IMAGE_COMPRESSION
@@ -235,12 +254,30 @@ KBUILD_TARGET := barebox.spi
 KBUILD_IMAGE := barebox.spi
 endif
 
+barebox.zynq: $(KBUILD_BINARY)
+	$(Q)scripts/zynq_mkimage $< $@
+
+ifeq ($(machine-y),zynq)
+KBUILD_TARGET := barebox.zynq
+KBUILD_IMAGE := barebox.zynq
+endif
+
 pbl := arch/arm/pbl
 zbarebox.S zbarebox.bin zbarebox: barebox.bin
 	$(Q)$(MAKE) $(build)=$(pbl) $(pbl)/$@
 
 archclean:
 	$(MAKE) $(clean)=$(pbl)
+
+dts := arch/arm/dts
+
+%.dtb: scripts
+	$(Q)$(MAKE) $(build)=$(dts) $(dts)/$@
+
+dtbs: scripts
+	$(Q)$(MAKE) $(build)=$(dts) dtbs
+
+KBUILD_DTBS := dtbs
 
 KBUILD_IMAGE ?= $(KBUILD_BINARY)
 
@@ -264,6 +301,8 @@ endif
 
 common-y += $(BOARD) $(MACH)
 common-y += arch/arm/lib/ arch/arm/cpu/
+
+common-$(CONFIG_BUILTIN_DTB) += arch/arm/dts/
 
 lds-y	:= arch/arm/lib/barebox.lds
 

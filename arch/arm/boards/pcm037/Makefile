@@ -16,6 +16,5 @@
 #
 #
 
-obj-y += lowlevel_init.o
-pbl-y += lowlevel_init.o
+lwl-y += lowlevel.o
 obj-y += pcm037.o

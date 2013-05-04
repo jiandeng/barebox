@@ -1,14 +1,13 @@
 #include <common.h>
 #include <console.h>
 #include <init.h>
-#include <fs.h>
 #include <driver.h>
 #include <io.h>
 #include <ns16550.h>
 #include <asm/armlinux.h>
-#include <linux/stat.h>
 #include <generated/mach-types.h>
-#include <mach/silicon.h>
+#include <mach/omap4-silicon.h>
+#include <mach/omap4-devices.h>
 #include <mach/sdrc.h>
 #include <mach/sys_info.h>
 #include <mach/syslib.h>
@@ -18,8 +17,7 @@
 #include <sizes.h>
 #include <asm/mmu.h>
 #include <mach/gpio.h>
-#include <environment.h>
-#include <mach/xload.h>
+#include <envfs.h>
 #include <i2c/i2c.h>
 #include <gpio.h>
 #include <led.h>
@@ -33,16 +31,9 @@ static int board_revision;
 #define GPIO_BOARD_ID1 101
 #define GPIO_BOARD_ID2 171
 
-static struct NS16550_plat serial_plat = {
-	.clock = 48000000,      /* 48MHz (APLL96/2) */
-	.shift = 2,
-};
-
 static int panda_console_init(void)
 {
-	/* Register the serial port */
-	add_ns16550_device(DEVICE_ID_DYNAMIC, OMAP44XX_UART3_BASE, 1024,
-			IORESOURCE_MEM_8BIT, &serial_plat);
+	omap44xx_add_uart3();
 
 	return 0;
 }
@@ -50,7 +41,7 @@ console_initcall(panda_console_init);
 
 static int panda_mem_init(void)
 {
-	arm_add_mem_device("ram0", 0x80000000, SZ_1G);
+	omap_add_ram0(SZ_1G);
 
 	return 0;
 }
@@ -92,8 +83,7 @@ static void panda_ehci_init(void)
 	/* enable power to hub */
 	gpio_set_value(GPIO_HUB_POWER, 1);
 
-	add_usb_ehci_device(DEVICE_ID_DYNAMIC, 0x4a064c00,
-			    0x4a064c00 + 0x10, &ehci_pdata);
+	omap44xx_add_ehci(&ehci_pdata);
 }
 #else
 static void panda_ehci_init(void)
@@ -126,7 +116,6 @@ struct gpio_led panda_leds[] = {
 
 static void panda_led_init(void)
 {
-	gpio_direction_output(7, 0);
 	led_gpio_register(&panda_leds[0]);
 	led_set_trigger(LED_TRIGGER_HEARTBEAT, &panda_leds[0].led);
 }
@@ -160,13 +149,9 @@ static int panda_devices_init(void)
 	}
 
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
-	add_generic_device("i2c-omap", DEVICE_ID_DYNAMIC,
-				NULL, 0x48070000, 0x1000,
-				IORESOURCE_MEM, NULL);
+	omap44xx_add_i2c1(NULL);
+	omap44xx_add_mmc1(NULL);
 
-
-	add_generic_device("omap-hsmmc", DEVICE_ID_DYNAMIC, NULL, 0x4809C100, SZ_4K,
-			   IORESOURCE_MEM, NULL);
 	panda_ehci_init();
 
 	panda_led_init();
@@ -176,30 +161,3 @@ static int panda_devices_init(void)
 	return 0;
 }
 device_initcall(panda_devices_init);
-
-#ifdef CONFIG_DEFAULT_ENVIRONMENT
-static int panda_env_init(void)
-{
-	struct stat s;
-	char *diskdev = "/dev/disk0.0";
-	int ret;
-
-	ret = stat(diskdev, &s);
-	if (ret) {
-		printf("no %s. using default env\n", diskdev);
-		return 0;
-	}
-
-	mkdir ("/boot", 0666);
-	ret = mount(diskdev, "fat", "/boot");
-	if (ret) {
-		printf("failed to mount %s\n", diskdev);
-		return 0;
-	}
-
-	default_environment_path = "/boot/bareboxenv";
-
-	return 0;
-}
-late_initcall(panda_env_init);
-#endif

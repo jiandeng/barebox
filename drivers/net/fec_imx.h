@@ -92,6 +92,7 @@
 
 #define FEC_ECNTRL_RESET                0x00000001	/**< reset the FEC */
 #define FEC_ECNTRL_ETHER_EN             0x00000002	/**< enable the FEC */
+#define FEC_ECNTRL_SPEED                0x00000020	/**< i.MX6: enable 1000Mbps mode */
 
 /**
  * @brief Descriptor buffer alignment
@@ -134,7 +135,6 @@ enum fec_type {
 struct fec_priv {
 	struct eth_device edev;
 	void __iomem *regs;
-	xceiver_type xcv_type;			/* transceiver type          */
 	struct buffer_descriptor __iomem *rbd_base;	/* RBD ring                  */
 	int rbd_index;				/* next receive BD to read   */
 	struct buffer_descriptor __iomem *tbd_base;	/* TBD ring                  */

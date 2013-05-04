@@ -3,7 +3,11 @@
 
 #include <linux/mtd/mtd.h>
 
-void imx_nand_load_image(void *dest, int size);
+void imx21_barebox_boot_nand_external(void);
+void imx25_barebox_boot_nand_external(void);
+void imx27_barebox_boot_nand_external(void);
+void imx31_barebox_boot_nand_external(void);
+void imx35_barebox_boot_nand_external(void);
 void imx_nand_set_layout(int writesize, int datawidth);
 
 struct imx_nand_platform_data {
@@ -65,5 +69,11 @@ struct imx_nand_platform_data {
 #define NFC_OUTPUT			(1 << 3)
 #define NFC_ID				(1 << 4)
 #define NFC_STATUS			(1 << 5)
+
+/*
+ * For external NAND boot this defines the magic value for the bad block table
+ * This is found at offset ARM_HEAD_SPARE_OFS in the image on NAND.
+ */
+#define IMX_NAND_BBT_MAGIC 0xbadb10c0
 
 #endif /* __ASM_ARCH_NAND_H */

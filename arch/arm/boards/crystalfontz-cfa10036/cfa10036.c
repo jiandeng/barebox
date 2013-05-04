@@ -17,6 +17,7 @@
 
 #include <common.h>
 #include <environment.h>
+#include <envfs.h>
 #include <errno.h>
 #include <fec.h>
 #include <gpio.h>
@@ -25,6 +26,10 @@
 #include <io.h>
 #include <net.h>
 #include <sizes.h>
+
+#include <i2c/i2c.h>
+#include <i2c/i2c-gpio.h>
+#include <i2c/at24.h>
 
 #include <mach/clock.h>
 #include <mach/imx-regs.h>
@@ -37,6 +42,8 @@
 #include <mach/fb.h>
 
 #include <generated/mach-types.h>
+
+#include "hwdetect.h"
 
 /* setup the CPU card internal signals */
 static const uint32_t cfa10036_pads[] = {
@@ -58,6 +65,10 @@ static const uint32_t cfa10036_pads[] = {
 	SSP0_SCK | VE_3_3V | BITKEEPER(0),
 	/* MCI slot power control 1 = off */
 	PWM3_GPIO | VE_3_3V | GPIO_OUT | GPIO_VALUE(0),
+
+	/* i2c0 */
+	AUART0_TX_GPIO | VE_3_3V | PULLUP(1),
+	AUART0_RX_GPIO | VE_3_3V | PULLUP(1),
 };
 
 static struct mxs_mci_platform_data mci_pdata = {
@@ -67,9 +78,37 @@ static struct mxs_mci_platform_data mci_pdata = {
 	.f_max = 25000000,
 };
 
+static struct i2c_board_info cfa10036_i2c_devices[] = {
+	{
+		I2C_BOARD_INFO("24c02", 0x50)
+	},
+};
+
+static struct i2c_gpio_platform_data i2c_gpio_pdata = {
+	.sda_pin		= 3 * 32 + 1,
+	.scl_pin		= 3 * 32 + 0,
+	.udelay			= 5,		/* ~100 kHz */
+};
+
+void v5_mmu_cache_flush(void);
+long cfa10036_get_ram_size(void)
+{
+	volatile u32 *base = (void *)IMX_MEMORY_BASE;
+	volatile u32 *ofs = base + SZ_128M / sizeof(u32);
+
+	*base = *ofs = 0xdeadbeef;
+	*ofs = 0xbaadcafe;
+
+	v5_mmu_cache_flush();
+	if (*base == 0xbaadcafe)
+		return SZ_128M;
+	else
+		return SZ_256M;
+}
+
 static int cfa10036_mem_init(void)
 {
-	arm_add_mem_device("ram0", IMX_MEMORY_BASE, 128 * 1024 * 1024);
+	arm_add_mem_device("ram0", IMX_MEMORY_BASE, cfa10036_get_ram_size());
 
 	return 0;
 }
@@ -77,7 +116,7 @@ mem_initcall(cfa10036_mem_init);
 
 static int cfa10036_devices_init(void)
 {
-	int i;
+	int i, ret;
 
 	/* initizalize muxing */
 	for (i = 0; i < ARRAY_SIZE(cfa10036_pads); i++)
@@ -96,6 +135,16 @@ static int cfa10036_devices_init(void)
 
 	add_generic_device("ocotp", 0, NULL, IMX_OCOTP_BASE, SZ_8K,
 			   IORESOURCE_MEM, NULL);
+
+	i2c_register_board_info(0, cfa10036_i2c_devices, ARRAY_SIZE(cfa10036_i2c_devices));
+	add_generic_device_res("i2c-gpio", 0, NULL, 0, &i2c_gpio_pdata);
+
+	cfa10036_detect_hw();
+
+	ret = envfs_register_partition("disk0", 1);
+	if (ret != 0)
+		printf("Cannot create the 'env0' persistent "
+			 "environment storage (%d)\n", ret);
 
 	return 0;
 }

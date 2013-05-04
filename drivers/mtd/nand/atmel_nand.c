@@ -1114,8 +1114,42 @@ static int __init atmel_nand_probe(struct device_d *dev)
 	nand_chip->IO_ADDR_W = host->io_base;
 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
 
-	if (host->board->rdy_pin)
+	if (gpio_is_valid(host->board->rdy_pin)) {
+		res = gpio_request(host->board->rdy_pin, "nand_rdy");
+		if (res < 0) {
+			dev_err(dev, "can't request rdy gpio %d\n",
+				host->board->rdy_pin);
+			goto err_no_card;
+		}
+
+		res = gpio_direction_input(host->board->rdy_pin);
+		if (res < 0) {
+			dev_err(dev,
+				"can't request input direction rdy gpio %d\n",
+				host->board->rdy_pin);
+			goto err_no_card;
+		}
+
 		nand_chip->dev_ready = atmel_nand_device_ready;
+	}
+
+	if (gpio_is_valid(host->board->enable_pin)) {
+		res = gpio_request(host->board->enable_pin, "nand_enable");
+		if (res < 0) {
+			dev_err(dev,
+				"can't request enable gpio %d\n",
+				host->board->enable_pin);
+			goto err_no_card;
+		}
+
+		res = gpio_direction_output(host->board->enable_pin, 1);
+		if (res < 0) {
+			dev_err(dev,
+				"can't request output direction enable gpio %d\n",
+				host->board->enable_pin);
+			goto err_no_card;
+		}
+	}
 
 	nand_chip->ecc.mode = NAND_ECC_SOFT;
 
@@ -1137,17 +1171,32 @@ static int __init atmel_nand_probe(struct device_d *dev)
 
 	atmel_nand_enable(host);
 
-	if (host->board->det_pin) {
+	if (gpio_is_valid(host->board->det_pin)) {
+		res = gpio_request(host->board->det_pin, "nand_det");
+		if (res < 0) {
+			dev_err(dev, "can't request det gpio %d\n",
+				host->board->det_pin);
+			goto err_no_card;
+		}
+
+		res = gpio_direction_input(host->board->det_pin);
+		if (res < 0) {
+			dev_err(dev,
+				"can't request input direction det gpio %d\n",
+				host->board->det_pin);
+			goto err_no_card;
+		}
+
 		if (gpio_get_value(host->board->det_pin)) {
 			printk("No SmartMedia card inserted.\n");
-			res = ENXIO;
+			res = -ENXIO;
 			goto err_no_card;
 		}
 	}
 
 	if (host->board->on_flash_bbt) {
 		printk(KERN_INFO "atmel_nand: Use On Flash BBT\n");
-		nand_chip->options |= NAND_USE_FLASH_BBT;
+		nand_chip->bbt_options |= NAND_BBT_USE_FLASH;
 	}
 
 
@@ -1174,7 +1223,7 @@ static int __init atmel_nand_probe(struct device_d *dev)
 		goto err_scan_tail;
 	}
 
-	add_mtd_device(mtd, "nand");
+	add_mtd_nand_device(mtd, "nand");
 
 	if (!res)
 		return res;
@@ -1193,13 +1242,7 @@ static struct driver_d atmel_nand_driver = {
 	.name	= "atmel_nand",
 	.probe	= atmel_nand_probe,
 };
-
-static int __init atmel_nand_init(void)
-{
-	return platform_driver_register(&atmel_nand_driver);
-}
-
-device_initcall(atmel_nand_init);
+device_platform_driver(atmel_nand_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Rick Bronson");

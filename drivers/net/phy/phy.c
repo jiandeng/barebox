@@ -49,7 +49,7 @@ int phy_update_status(struct phy_device *dev)
 		dev->adjust_link(edev);
 
 	if (dev->link)
-		printf("%dMbps %s duplex link detected\n", dev->speed,
+		pr_info("%dMbps %s duplex link detected\n", dev->speed,
 			dev->duplex ? "full" : "half");
 
 	return 0;
@@ -548,6 +548,10 @@ int genphy_read_status(struct phy_device *phydev)
 	int err;
 	int lpa;
 	int lpagb = 0;
+
+	/* if force the status and link are set */
+	if (phydev->force)
+		return 0;
 
 	/* Update the link, but return if there
 	 * was an error */

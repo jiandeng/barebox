@@ -4,6 +4,8 @@
  * Under GPLv2
  */
 
+#define __LOWLEVEL_INIT__
+
 #include <common.h>
 #include <asm/system.h>
 #include <asm/barebox-arm.h>
@@ -21,27 +23,27 @@ void static inline access_sdram(void)
 	writel(0x00000000, AT91_SDRAM_BASE);
 }
 
-void __naked __bare_init reset(void)
+void __naked __bare_init barebox_arm_reset_vector(void)
 {
 	u32 r;
 	int i;
 
-	common_reset();
+	arm_cpu_lowlevel_init();
 
 	/*
 	 * PMC Check if the PLL is already initialized
 	 */
-	r = at91_sys_read(AT91_PMC_MCKR);
+	r = at91_pmc_read(AT91_PMC_MCKR);
 	if (r & AT91_PMC_CSS)
 		goto end;
 
 	/*
 	 * Enable the Main Oscillator
 	 */
-	at91_sys_write(AT91_CKGR_MOR, CONFIG_SYS_MOR_VAL);
+	at91_pmc_write(AT91_CKGR_MOR, CONFIG_SYS_MOR_VAL);
 
 	do {
-		r = at91_sys_read(AT91_PMC_SR);
+		r = at91_pmc_read(AT91_PMC_SR);
 	} while (!(r & AT91_PMC_MOSCS));
 
 	/*
@@ -61,24 +63,24 @@ void __naked __bare_init reset(void)
 	/*
 	 * PLLAR: x MHz for PCK
 	 */
-	at91_sys_write(AT91_CKGR_PLLAR, CONFIG_SYS_PLLAR_VAL);
+	at91_pmc_write(AT91_CKGR_PLLAR, CONFIG_SYS_PLLAR_VAL);
 
 	do {
-		r = at91_sys_read(AT91_PMC_SR);
+		r = at91_pmc_read(AT91_PMC_SR);
 	} while (!(r & AT91_PMC_LOCKA));
 
 	/*
 	 * PCK/x = MCK Master Clock from SLOW
 	 */
-	at91_sys_write(AT91_PMC_MCKR, CONFIG_SYS_MCKR2_VAL1);
+	at91_pmc_write(AT91_PMC_MCKR, CONFIG_SYS_MCKR2_VAL1);
 
 	/*
 	 * PCK/x = MCK Master Clock from PLLA
 	 */
-	at91_sys_write(AT91_PMC_MCKR, CONFIG_SYS_MCKR2_VAL2);
+	at91_pmc_write(AT91_PMC_MCKR, CONFIG_SYS_MCKR2_VAL2);
 
 	do {
-		r = at91_sys_read(AT91_PMC_SR);
+		r = at91_pmc_read(AT91_PMC_SR);
 	} while (!(r & AT91_PMC_MCKRDY));
 
 	/*
@@ -127,5 +129,5 @@ void __naked __bare_init reset(void)
 	set_cr(r);
 
 end:
-	board_init_lowlevel_return();
+	barebox_arm_entry(AT91_CHIPSELECT_1, at91rm9200_get_sdram_size(), 0);
 }
