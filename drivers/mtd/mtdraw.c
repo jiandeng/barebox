@@ -36,7 +36,7 @@
 #include "mtd.h"
 
 /* Must be a multiple of the largest NAND page size */
-#define RAW_WRITEBUF_SIZE	4096
+#define RAW_WRITEBUF_SIZE	16384
 
 /**
  * mtdraw - mtdraw device private data

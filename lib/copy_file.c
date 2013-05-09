@@ -6,7 +6,7 @@
 #include <libbb.h>
 #include <progress.h>
 
-#define RW_BUF_SIZE	(ulong)4096
+#define RW_BUF_SIZE	(ulong)8192
 
 /**
  * @param[in] src FIXME

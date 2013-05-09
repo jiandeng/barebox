@@ -144,9 +144,7 @@ static int tiny210_devices_init(void)
                          S3C_NAND_BASE, 0x40000, IORESOURCE_MEM, NULL);
 
 #ifdef CONFIG_PARTITION
-	devfs_add_partition("nand0", 0x00000, SZ_512K, DEVFS_PARTITION_FIXED, "self_raw");
-	dev_add_bb_dev("self_raw", "self0");
-	devfs_add_partition("nand0", SZ_512K, SZ_512K, DEVFS_PARTITION_FIXED, "env_raw");
+	devfs_add_partition("nand0", SZ_1M, SZ_1M, DEVFS_PARTITION_FIXED, "env_raw");
 	dev_add_bb_dev("env_raw", "env0");
 #endif
 

@@ -1230,24 +1230,13 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 				id_data[0] == NAND_MFR_SAMSUNG &&
 				(chip->cellinfo & NAND_CI_CELLTYPE_MSK) &&
 				id_data[5] != 0x00) {
-			/* Calc pagesize */
-			mtd->writesize = 2048 << (extid & 0x03);
-			extid >>= 2;
-			/* Calc oobsize */
-			switch (extid & 0x03) {
-			case 1:
-				mtd->oobsize = 128;
-				break;
-			case 2:
-				mtd->oobsize = 218;
-				break;
-			case 3:
-				mtd->oobsize = 400;
-				break;
-			default:
-				mtd->oobsize = 436;
-				break;
-			}
+                       int __oobsz[] = { 0, 128, 218, 400, 436, 512, 640, 0 };
+                       
+                        /* Calc pagesize */
+                        mtd->writesize = 2048 << (extid & 0x03);
+                        extid >>= 2;
+                        /* Calc oobsize */
+                        mtd->oobsize = __oobsz[ (((extid >> 1) & 0x04) | (extid & 0x03)) ];
 			extid >>= 2;
 			/* Calc blocksize */
 			mtd->erasesize = (128 * 1024) <<

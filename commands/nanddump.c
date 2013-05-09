@@ -46,13 +46,6 @@ static int dump_nandraw(char *dev, int block, int page)
 		return COMMAND_ERROR_USAGE;
 	}
 
-	/* Getting flash information. */
-	ret = ioctl(fd, MEMGETINFO, &nandinfo);
-	if (ret < 0) {
-		perror("MEMGETINFO");
-		goto err;
-	}
-	
 	/* Calculate the offset and length to read */
 	length = nandinfo.writesize + nandinfo.oobsize;
 	offset = block * nandinfo.erasesize + page * nandinfo.writesize;
@@ -132,13 +125,6 @@ static int dump_nandoob(char *dev, int block, int page)
 		return COMMAND_ERROR_USAGE;
 	}
 
-	/* Getting flash information. */
-	ret = ioctl(fd, MEMGETINFO, &nandinfo);
-	if (ret < 0) {
-		perror("MEMGETINFO");
-		goto err;
-	}
-	
 	/* Calculate the offset and length to read */
 	length = nandinfo.oobsize;
 	offset = block * nandinfo.erasesize + page * nandinfo.writesize;
@@ -218,13 +204,6 @@ static int dump_nand(char *dev, int block, int page)
 		return COMMAND_ERROR_USAGE;
 	}
 
-	/* Getting flash information. */
-	ret = ioctl(fd, MEMGETINFO, &nandinfo);
-	if (ret < 0) {
-		perror("MEMGETINFO");
-		goto err;
-	}
-	
 	ret = ioctl(fd, ECCGETSTATS, &oldstats);
 	if (ret < 0) {
 		perror("ECCGETSTATS");
@@ -305,12 +284,29 @@ err:
 /* Main program. */
 static int do_nanddump(int argc, char *argv[])
 {
+	int fd = -1;
 	int ret = -1;
 	int opt = -1;
 	int mode = 'n';	// default to dump normal device
 	off_t block = 0; // default to dump block 0
 	off_t page = 0; // default to dump page 0
 	char *dev = NULL;
+
+	/* Open device */
+	fd = open("/dev/nand0", O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		return COMMAND_ERROR_USAGE;
+	}
+
+	/* Getting flash information. */
+	ret = ioctl(fd, MEMGETINFO, &nandinfo);
+	if (ret < 0) {
+		perror("MEMGETINFO");
+	}
+	
+	/* Close device */
+	close(fd);
 
 	while ((opt = getopt(argc, argv, "d:b:p:ro")) > 0) {
 		switch (opt) {

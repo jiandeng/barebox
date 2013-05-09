@@ -147,3 +147,14 @@
 		cp /mnt/tftp/ubifs.img /dev/ubi0.root
 	Boot from nand flash (on the target)
 		boot ubi
+10.Basic support for MLC NAND
+	# CHANGE nanddump.c to support mtdraw & mtdoob devices 
+	# CHANGE nand_base.c to support 512/640 byte oob
+	# CHANGE the size of mtdraw/mtdoob write buffer size to support 8kB large page
+	# ADD support for mlc nand, according to the ecc layout of the kernel
+	# ADD support for mlc nand boot, according to the ecc layout of the iROM loader
+	# ADD support for automatic nand type recognition while nand booting
+	Disable "System Type  --->S3C Features  --->[ ] Booting from NAND", this is SD boot version
+	Enable "System Type  --->S3C Features  --->[*] Booting from NAND", this is nand boot version
+	# The SD boot version uses a spical methord to access nand flash, it's only used to update the bootloader in the nand flash
+	# The nand boot version can not be used to update the bootloader in the nand flash 
